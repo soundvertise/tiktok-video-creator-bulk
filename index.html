@@ -626,6 +626,8 @@
         const video = document.getElementById('main-video');
         const audio = document.getElementById('bg-music');
         const caption = document.getElementById('caption-overlay');
+        const captionElement = document.getElementById('caption-overlay');
+        const videoContainer = document.getElementById('drop-zone');
         const vTrimOverlay = document.getElementById('video-trim-overlay');
         const aTrimOverlay = document.getElementById('audio-trim-overlay');
         const vTrimmerTrack = document.getElementById('v-trimmer-track');
@@ -1401,44 +1403,60 @@
         }
 
         function captureCurrentState() {
+            console.log('captureCurrentState called');
+            console.log('videoFile:', videoFile);
+            
             if (!videoFile) {
                 alert('Carica prima un video!');
                 return null;
             }
 
-            const containerRect = videoContainer.getBoundingClientRect();
-            const captionRect = captionElement.getBoundingClientRect();
+            try {
+                const containerRect = videoContainer.getBoundingClientRect();
+                const captionRect = captionElement.getBoundingClientRect();
+                
+                console.log('Container rect:', containerRect);
+                console.log('Caption rect:', captionRect);
 
-            return {
-                // Video data
-                videoFile: videoFile,
-                videoFileName: videoFile.name,
-                vStart: vStart,
-                vEnd: vEnd,
-                duration: vEnd - vStart,
+                const state = {
+                    // Video data
+                    videoFile: videoFile,
+                    videoFileName: videoFile.name,
+                    vStart: vStart,
+                    vEnd: vEnd,
+                    duration: vEnd - vStart,
+                    
+                    // Audio data
+                    audioFile: audioFile,
+                    audioFileName: audioFile ? audioFile.name : null,
+                    aStart: aStart,
+                    hasAudio: !!audioFile,
+                    
+                    // Caption data
+                    caption: captionElement.innerText,
+                    captionTopPx: captionRect.top - containerRect.top,
+                    captionMaxWidthPx: captionElement.offsetWidth,
+                    fontSize: parseInt(captionElement.style.fontSize || '12'),
+                    textColor: captionElement.style.color || '#ffffff',
+                    outlineColor: getComputedStyle(captionElement).getPropertyValue('--outline-color') || '#000000',
+                    fontClass: captionElement.className,
+                    hasOutline: captionElement.classList.contains('text-bold-outline'),
+                    
+                    // Settings
+                    removeWatermark: removeWatermark,
+                    
+                    // Timestamp
+                    timestamp: Date.now()
+                };
                 
-                // Audio data
-                audioFile: audioFile,
-                audioFileName: audioFile ? audioFile.name : null,
-                aStart: aStart,
-                hasAudio: !!audioFile,
+                console.log('State created successfully:', state);
+                return state;
                 
-                // Caption data
-                caption: captionElement.innerText,
-                captionTopPx: captionRect.top - containerRect.top,
-                captionMaxWidthPx: captionElement.offsetWidth,
-                fontSize: parseInt(captionElement.style.fontSize || '12'),
-                textColor: captionElement.style.color || '#ffffff',
-                outlineColor: getComputedStyle(captionElement).getPropertyValue('--outline-color') || '#000000',
-                fontClass: captionElement.className,
-                hasOutline: captionElement.classList.contains('text-bold-outline'),
-                
-                // Settings
-                removeWatermark: removeWatermark,
-                
-                // Timestamp
-                timestamp: Date.now()
-            };
+            } catch (error) {
+                console.error('Error in captureCurrentState:', error);
+                alert('Errore nel catturare lo stato: ' + error.message);
+                return null;
+            }
         }
 
         function loadQueueItem(index) {
@@ -1534,22 +1552,46 @@
 
         // Add to queue button
         document.getElementById('add-to-queue-btn').onclick = () => {
+            console.log('Add to queue clicked');
+            console.log('Current queue length:', videoQueue.length);
+            console.log('Video file:', videoFile);
+            
             if (videoQueue.length >= MAX_QUEUE_SIZE) {
                 alert(`Puoi aggiungere massimo ${MAX_QUEUE_SIZE} video alla coda!`);
                 return;
             }
             
-            const state = captureCurrentState();
-            if (!state) return;
-            
-            videoQueue.push(state);
-            currentQueueIndex = videoQueue.length - 1;
-            updateQueueUI();
-            
-            // Visual feedback
-            const btn = document.getElementById('add-to-queue-btn');
-            btn.style.transform = 'scale(0.95)';
-            setTimeout(() => btn.style.transform = 'scale(1)', 100);
+            try {
+                const state = captureCurrentState();
+                console.log('Captured state:', state);
+                
+                if (!state) {
+                    console.log('State is null, aborting');
+                    return;
+                }
+                
+                videoQueue.push(state);
+                currentQueueIndex = videoQueue.length - 1;
+                console.log('Video added to queue. New length:', videoQueue.length);
+                
+                updateQueueUI();
+                
+                // Visual feedback
+                const btn = document.getElementById('add-to-queue-btn');
+                btn.style.transform = 'scale(0.95)';
+                setTimeout(() => btn.style.transform = 'scale(1)', 100);
+                
+                // Success message
+                const statusDiv = document.createElement('div');
+                statusDiv.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg font-bold text-sm z-50';
+                statusDiv.innerText = `✓ Video ${videoQueue.length} aggiunto alla coda!`;
+                document.body.appendChild(statusDiv);
+                setTimeout(() => statusDiv.remove(), 2000);
+                
+            } catch (error) {
+                console.error('Error adding to queue:', error);
+                alert('Errore durante l\'aggiunta alla coda: ' + error.message);
+            }
         };
 
         // Navigation buttons
