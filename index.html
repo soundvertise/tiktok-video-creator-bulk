@@ -447,20 +447,22 @@
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="space-y-1">
-                    <label class="text-[9px] font-black uppercase text-zinc-500">File Video</label>
+                    <label class="text-[9px] font-black uppercase text-zinc-500">File Video (Max 20)</label>
                     <label for="video-input" class="flex items-center gap-3 bg-black border border-zinc-800 p-3 rounded-xl cursor-pointer hover:border-blue-500 transition-all">
                         <i data-lucide="video" class="w-4 h-4 text-blue-400"></i>
-                        <span class="text-[11px] text-zinc-400 truncate" id="video-label">Carica Video</span>
-                        <input type="file" id="video-input" accept="video/*" class="hidden">
+                        <span class="text-[11px] text-zinc-400 truncate" id="video-label">Carica Video (Multipli)</span>
+                        <input type="file" id="video-input" accept="video/*" multiple class="hidden">
                     </label>
+                    <div id="video-files-list" class="text-[9px] text-zinc-500 mt-1"></div>
                 </div>
                 <div class="space-y-1">
-                    <label class="text-[9px] font-black uppercase text-zinc-500">File Audio</label>
+                    <label class="text-[9px] font-black uppercase text-zinc-500">File Audio (Max 20)</label>
                     <label for="audio-input" class="flex items-center gap-3 bg-black border border-zinc-800 p-3 rounded-xl cursor-pointer hover:border-violet-500 transition-all">
                         <i data-lucide="music" class="w-4 h-4 text-violet-400"></i>
-                        <span class="text-[11px] text-zinc-400 truncate" id="audio-label">Carica Audio (Opzionale)</span>
-                        <input type="file" id="audio-input" accept="audio/*" class="hidden">
+                        <span class="text-[11px] text-zinc-400 truncate" id="audio-label">Carica Audio (Multipli)</span>
+                        <input type="file" id="audio-input" accept="audio/*" multiple class="hidden">
                     </label>
+                    <div id="audio-files-list" class="text-[9px] text-zinc-500 mt-1"></div>
                 </div>
             </div>
 
@@ -487,9 +489,14 @@
                         <i data-lucide="play" id="play-icon" class="w-5 h-5 fill-white"></i>
                     </button>
                     <div class="flex-1 space-y-1">
-                        <div class="flex justify-between text-[9px] font-black uppercase text-zinc-500">
+                        <div class="flex justify-between items-center text-[9px] font-black uppercase text-zinc-500">
                             <span>Onda Sonora (Loop Anteprima)</span>
-                            <span id="audio-start-label">Start Audio: 0.0s</span>
+                            <div class="flex items-center gap-2">
+                                <select id="audio-selector" class="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-[9px] text-zinc-300 font-bold cursor-pointer hover:border-violet-500 transition-all">
+                                    <option value="">Nessun Audio</option>
+                                </select>
+                                <span id="audio-start-label">Start: 0.0s</span>
+                            </div>
                         </div>
                         <div class="trimmer-track h-[70px]" id="a-trimmer-track">
                             <div class="waveform-wrapper">
@@ -578,6 +585,10 @@
                 <div class="flex items-center justify-between">
                     <span class="text-[10px] font-black uppercase text-blue-300 tracking-widest">🎬 Creazione Bulk</span>
                     <div class="flex gap-2">
+                        <button id="auto-queue-btn" class="px-3 py-1.5 bg-violet-600 hover:bg-violet-500 rounded-lg text-[9px] font-black uppercase transition-all flex items-center gap-1.5">
+                            <i data-lucide="zap" class="w-3 h-3"></i>
+                            Auto-Coda
+                        </button>
                         <button id="prev-video-btn" class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-[9px] font-black uppercase transition-all flex items-center gap-1.5 disabled:opacity-30">
                             <i data-lucide="chevron-left" class="w-3 h-3"></i>
                             Prev
@@ -650,6 +661,85 @@
         let isDraggingA = false;
         let dragOffsetV = 0;
         let dragOffsetA = 0;
+
+        // File libraries for bulk workflow
+        let videoLibrary = [];
+        let audioLibrary = [];
+        let currentVideoIndex = 0;
+        let currentAudioIndex = -1; // -1 means no audio selected
+
+        function updateFileLibraryUI() {
+            const videoList = document.getElementById('video-files-list');
+            const audioList = document.getElementById('audio-files-list');
+            
+            if (videoLibrary.length > 0) {
+                videoList.innerHTML = `📁 ${videoLibrary.length} video caricati`;
+                document.getElementById('video-label').innerText = `${videoLibrary.length} video pronti`;
+            } else {
+                videoList.innerHTML = '';
+                document.getElementById('video-label').innerText = 'Carica Video (Multipli)';
+            }
+            
+            if (audioLibrary.length > 0) {
+                audioList.innerHTML = `🎵 ${audioLibrary.length} audio caricati`;
+                document.getElementById('audio-label').innerText = `${audioLibrary.length} audio pronti`;
+                
+                // Update audio selector
+                const selector = document.getElementById('audio-selector');
+                selector.innerHTML = '<option value="">Nessun Audio</option>';
+                audioLibrary.forEach((audioFile, index) => {
+                    const option = document.createElement('option');
+                    option.value = index;
+                    option.textContent = audioFile.name;
+                    selector.appendChild(option);
+                });
+            } else {
+                audioList.innerHTML = '';
+                document.getElementById('audio-label').innerText = 'Carica Audio (Multipli)';
+            }
+        }
+
+        function loadVideoFromLibrary(index) {
+            if (index < 0 || index >= videoLibrary.length) return;
+            
+            currentVideoIndex = index;
+            videoFile = videoLibrary[index];
+            video.src = URL.createObjectURL(videoFile);
+            video.onloadedmetadata = () => {
+                videoDuration = video.duration;
+                vStart = 0;
+                vEnd = Math.min(videoDuration, 15);
+                updateTrimmers();
+                video.currentTime = vStart;
+            };
+            generateThumbnails(videoFile);
+        }
+
+        function loadAudioFromSelector() {
+            const selector = document.getElementById('audio-selector');
+            const selectedIndex = parseInt(selector.value);
+            
+            if (isNaN(selectedIndex) || selectedIndex < 0) {
+                // No audio selected
+                currentAudioIndex = -1;
+                audioFile = null;
+                audio.src = '';
+                audioDuration = 0;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                updateTrimmers();
+                return;
+            }
+            
+            currentAudioIndex = selectedIndex;
+            audioFile = audioLibrary[selectedIndex];
+            audio.src = URL.createObjectURL(audioFile);
+            audio.onloadedmetadata = () => {
+                audioDuration = audio.duration;
+                drawWaveform(audioFile);
+                updateTrimmers();
+                audio.currentTime = aStart;
+            };
+        }
 
         // Toggle watermark removal
         document.getElementById('toggle-watermark').onclick = function() {
@@ -814,33 +904,55 @@
         };
 
         document.getElementById('video-input').onchange = async (e) => {
-            videoFile = e.target.files[0];
-            if (videoFile) {
-                video.src = URL.createObjectURL(videoFile);
-                document.getElementById('video-label').innerText = videoFile.name;
-                video.onloadedmetadata = () => {
-                    videoDuration = video.duration;
-                    vStart = 0;
-                    vEnd = Math.min(videoDuration, 15);
-                    updateTrimmers();
-                    video.currentTime = vStart;
-                };
-                generateThumbnails(videoFile);
+            const files = Array.from(e.target.files);
+            if (files.length === 0) return;
+            
+            if (files.length > MAX_QUEUE_SIZE) {
+                alert(`Puoi caricare massimo ${MAX_QUEUE_SIZE} video!`);
+                videoLibrary = files.slice(0, MAX_QUEUE_SIZE);
+            } else {
+                videoLibrary = files;
+            }
+            
+            updateFileLibraryUI();
+            
+            // Load first video automatically
+            if (videoLibrary.length > 0) {
+                loadVideoFromLibrary(0);
+                
+                // Show success notification
+                const statusDiv = document.createElement('div');
+                statusDiv.className = 'fixed top-4 right-4 bg-blue-500 text-white px-4 py-2 rounded-lg font-bold text-sm z-50';
+                statusDiv.innerText = `✓ ${videoLibrary.length} video caricati!`;
+                document.body.appendChild(statusDiv);
+                setTimeout(() => statusDiv.remove(), 2000);
             }
         };
 
         document.getElementById('audio-input').onchange = (e) => {
-            audioFile = e.target.files[0];
-            if (audioFile) {
-                audio.src = URL.createObjectURL(audioFile);
-                document.getElementById('audio-label').innerText = audioFile.name;
-                audio.onloadedmetadata = () => {
-                    audioDuration = audio.duration;
-                    drawWaveform(audioFile);
-                    updateTrimmers();
-                    audio.currentTime = aStart;
-                };
+            const files = Array.from(e.target.files);
+            if (files.length === 0) return;
+            
+            if (files.length > MAX_QUEUE_SIZE) {
+                alert(`Puoi caricare massimo ${MAX_QUEUE_SIZE} audio!`);
+                audioLibrary = files.slice(0, MAX_QUEUE_SIZE);
+            } else {
+                audioLibrary = files;
             }
+            
+            updateFileLibraryUI();
+            
+            // Show success notification
+            const statusDiv = document.createElement('div');
+            statusDiv.className = 'fixed top-4 right-4 bg-violet-500 text-white px-4 py-2 rounded-lg font-bold text-sm z-50';
+            statusDiv.innerText = `✓ ${audioLibrary.length} audio caricati!`;
+            document.body.appendChild(statusDiv);
+            setTimeout(() => statusDiv.remove(), 2000);
+        };
+
+        // Audio selector change handler
+        document.getElementById('audio-selector').onchange = () => {
+            loadAudioFromSelector();
         };
 
         document.getElementById('play-btn').onclick = () => {
@@ -1422,6 +1534,7 @@
                     // Video data
                     videoFile: videoFile,
                     videoFileName: videoFile.name,
+                    videoLibraryIndex: currentVideoIndex,
                     vStart: vStart,
                     vEnd: vEnd,
                     duration: vEnd - vStart,
@@ -1429,6 +1542,7 @@
                     // Audio data
                     audioFile: audioFile,
                     audioFileName: audioFile ? audioFile.name : null,
+                    audioLibraryIndex: currentAudioIndex,
                     aStart: aStart,
                     hasAudio: !!audioFile,
                     
@@ -1468,8 +1582,8 @@
             // Restore video
             if (item.videoFile) {
                 videoFile = item.videoFile;
+                currentVideoIndex = item.videoLibraryIndex || 0;
                 video.src = URL.createObjectURL(item.videoFile);
-                document.getElementById('video-label').innerText = item.videoFileName;
                 video.onloadedmetadata = () => {
                     videoDuration = video.duration;
                     vStart = item.vStart;
@@ -1477,23 +1591,32 @@
                     updateTrimmers();
                     video.currentTime = vStart;
                 };
+                generateThumbnails(item.videoFile);
             }
             
             // Restore audio
             if (item.audioFile) {
                 audioFile = item.audioFile;
+                currentAudioIndex = item.audioLibraryIndex || -1;
                 audio.src = URL.createObjectURL(item.audioFile);
-                document.getElementById('audio-label').innerText = item.audioFileName;
                 audio.onloadedmetadata = () => {
                     audioDuration = audio.duration;
                     aStart = item.aStart;
                     drawWaveform(item.audioFile);
                     updateTrimmers();
                 };
+                
+                // Update selector
+                const selector = document.getElementById('audio-selector');
+                if (currentAudioIndex >= 0) {
+                    selector.value = currentAudioIndex;
+                }
             } else {
                 audioFile = null;
+                currentAudioIndex = -1;
                 audio.src = '';
-                document.getElementById('audio-label').innerText = 'Carica Audio (Opzionale)';
+                document.getElementById('audio-selector').value = '';
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
             }
             
             // Restore caption
@@ -1598,13 +1721,89 @@
         document.getElementById('prev-video-btn').onclick = () => {
             if (currentQueueIndex > 0) {
                 loadQueueItem(currentQueueIndex - 1);
+            } else if (videoLibrary.length > 0 && currentVideoIndex > 0) {
+                // Navigate to previous video in library
+                loadVideoFromLibrary(currentVideoIndex - 1);
             }
         };
 
         document.getElementById('next-video-btn').onclick = () => {
             if (currentQueueIndex < videoQueue.length - 1) {
                 loadQueueItem(currentQueueIndex + 1);
+            } else if (videoLibrary.length > 0 && currentVideoIndex < videoLibrary.length - 1) {
+                // Navigate to next video in library
+                loadVideoFromLibrary(currentVideoIndex + 1);
+                
+                // Auto-select caption if available
+                const randomBtn = document.getElementById('random-caption-btn');
+                if (randomBtn) {
+                    randomBtn.click();
+                }
             }
+        };
+
+        // Auto-queue all videos button
+        document.getElementById('auto-queue-btn').onclick = async () => {
+            if (videoLibrary.length === 0) {
+                alert('Carica prima dei video!');
+                return;
+            }
+
+            if (!confirm(`Aggiungere automaticamente tutti i ${videoLibrary.length} video alla coda?\n\nOgni video avrà una caption casuale. Puoi selezionare l'audio per ognuno usando il menu a tendina.`)) {
+                return;
+            }
+
+            const autoQueueBtn = document.getElementById('auto-queue-btn');
+            autoQueueBtn.disabled = true;
+            autoQueueBtn.innerHTML = '<i data-lucide="loader" class="w-3 h-3 animate-spin"></i> Caricamento...';
+            lucide.createIcons();
+
+            for (let i = 0; i < videoLibrary.length && videoQueue.length < MAX_QUEUE_SIZE; i++) {
+                // Load video
+                currentVideoIndex = i;
+                videoFile = videoLibrary[i];
+                
+                // Wait for video to load
+                video.src = URL.createObjectURL(videoFile);
+                await new Promise(resolve => {
+                    video.onloadedmetadata = () => {
+                        videoDuration = video.duration;
+                        vStart = 0;
+                        vEnd = Math.min(videoDuration, 15);
+                        updateTrimmers();
+                        resolve();
+                    };
+                });
+
+                // Generate random caption
+                const captions = viralCaptions[selectedCategory];
+                const randomCaption = captions[Math.floor(Math.random() * captions.length)];
+                captionElement.innerText = randomCaption;
+                document.getElementById('caption-input').value = randomCaption;
+
+                // Add to queue
+                const state = captureCurrentState();
+                if (state) {
+                    videoQueue.push(state);
+                }
+
+                // Small delay for UI update
+                await new Promise(r => setTimeout(r, 100));
+            }
+
+            currentQueueIndex = videoQueue.length - 1;
+            updateQueueUI();
+
+            autoQueueBtn.disabled = false;
+            autoQueueBtn.innerHTML = '<i data-lucide="zap" class="w-3 h-3"></i> Auto-Coda';
+            lucide.createIcons();
+
+            // Success notification
+            const statusDiv = document.createElement('div');
+            statusDiv.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg font-bold text-sm z-50';
+            statusDiv.innerText = `✓ ${videoQueue.length} video aggiunti alla coda!`;
+            document.body.appendChild(statusDiv);
+            setTimeout(() => statusDiv.remove(), 3000);
         };
 
         // Initialize
