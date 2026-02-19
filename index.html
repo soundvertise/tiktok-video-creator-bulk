@@ -674,12 +674,22 @@
         let currentAudioIndex = -1; // -1 means no audio selected
 
         function updateFileLibraryUI() {
+            console.log('updateFileLibraryUI called');
+            console.log('Video library:', videoLibrary.length);
+            console.log('Audio library:', audioLibrary.length);
+            
             const videoList = document.getElementById('video-files-list');
             const audioList = document.getElementById('audio-files-list');
+            
+            if (!videoList || !audioList) {
+                console.error('Could not find file list elements!');
+                return;
+            }
             
             if (videoLibrary.length > 0) {
                 videoList.innerHTML = `📁 ${videoLibrary.length} video caricati`;
                 document.getElementById('video-label').innerText = `${videoLibrary.length} video pronti`;
+                console.log('Updated video UI');
             } else {
                 videoList.innerHTML = '';
                 document.getElementById('video-label').innerText = 'Carica Video (Multipli)';
@@ -691,13 +701,18 @@
                 
                 // Update audio selector
                 const selector = document.getElementById('audio-selector');
-                selector.innerHTML = '<option value="">Nessun Audio</option>';
-                audioLibrary.forEach((audioFile, index) => {
-                    const option = document.createElement('option');
-                    option.value = index;
-                    option.textContent = audioFile.name;
-                    selector.appendChild(option);
-                });
+                if (selector) {
+                    selector.innerHTML = '<option value="">Nessun Audio</option>';
+                    audioLibrary.forEach((audioFile, index) => {
+                        const option = document.createElement('option');
+                        option.value = index;
+                        option.textContent = audioFile.name;
+                        selector.appendChild(option);
+                    });
+                    console.log('Updated audio selector with', audioLibrary.length, 'options');
+                } else {
+                    console.error('Audio selector not found!');
+                }
             } else {
                 audioList.innerHTML = '';
                 document.getElementById('audio-label').innerText = 'Carica Audio (Multipli)';
@@ -705,19 +720,44 @@
         }
 
         function loadVideoFromLibrary(index) {
-            if (index < 0 || index >= videoLibrary.length) return;
+            console.log('loadVideoFromLibrary called with index:', index);
+            console.log('Video library length:', videoLibrary.length);
             
-            currentVideoIndex = index;
-            videoFile = videoLibrary[index];
-            video.src = URL.createObjectURL(videoFile);
-            video.onloadedmetadata = () => {
-                videoDuration = video.duration;
-                vStart = 0;
-                vEnd = Math.min(videoDuration, 15);
-                updateTrimmers();
-                video.currentTime = vStart;
-            };
-            generateThumbnails(videoFile);
+            if (index < 0 || index >= videoLibrary.length) {
+                console.error('Invalid video index:', index);
+                return;
+            }
+            
+            try {
+                currentVideoIndex = index;
+                videoFile = videoLibrary[index];
+                
+                console.log('Loading video:', videoFile.name);
+                
+                const videoURL = URL.createObjectURL(videoFile);
+                console.log('Video URL created:', videoURL);
+                
+                video.src = videoURL;
+                video.onloadedmetadata = () => {
+                    console.log('Video metadata loaded');
+                    videoDuration = video.duration;
+                    vStart = 0;
+                    vEnd = Math.min(videoDuration, 15);
+                    updateTrimmers();
+                    video.currentTime = vStart;
+                    console.log('Video ready:', videoDuration, 'seconds');
+                };
+                
+                video.onerror = (e) => {
+                    console.error('Video load error:', e);
+                    alert('Errore nel caricamento del video: ' + videoFile.name);
+                };
+                
+                generateThumbnails(videoFile);
+            } catch (error) {
+                console.error('Error in loadVideoFromLibrary:', error);
+                alert('Errore: ' + error.message);
+            }
         }
 
         function loadAudioFromSelector() {
@@ -912,6 +952,8 @@
             const files = Array.from(e.target.files);
             if (files.length === 0) return;
             
+            console.log('Video files selected:', files.length);
+            
             if (files.length > MAX_QUEUE_SIZE) {
                 alert(`Puoi caricare massimo ${MAX_QUEUE_SIZE} video!`);
                 videoLibrary = files.slice(0, MAX_QUEUE_SIZE);
@@ -919,10 +961,12 @@
                 videoLibrary = files;
             }
             
+            console.log('Video library updated:', videoLibrary.length);
             updateFileLibraryUI();
             
             // Load first video automatically
             if (videoLibrary.length > 0) {
+                console.log('Loading first video...');
                 loadVideoFromLibrary(0);
                 
                 // Show success notification
@@ -938,6 +982,8 @@
             const files = Array.from(e.target.files);
             if (files.length === 0) return;
             
+            console.log('Audio files selected:', files.length);
+            
             if (files.length > MAX_QUEUE_SIZE) {
                 alert(`Puoi caricare massimo ${MAX_QUEUE_SIZE} audio!`);
                 audioLibrary = files.slice(0, MAX_QUEUE_SIZE);
@@ -945,6 +991,7 @@
                 audioLibrary = files;
             }
             
+            console.log('Audio library updated:', audioLibrary.length);
             updateFileLibraryUI();
             
             // Show success notification
