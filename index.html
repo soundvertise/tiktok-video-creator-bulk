@@ -447,22 +447,20 @@
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="space-y-1">
-                    <label class="text-[9px] font-black uppercase text-zinc-500">File Video (Max 20)</label>
+                    <label class="text-[9px] font-black uppercase text-zinc-500">File Video</label>
                     <label for="video-input" class="flex items-center gap-3 bg-black border border-zinc-800 p-3 rounded-xl cursor-pointer hover:border-blue-500 transition-all">
                         <i data-lucide="video" class="w-4 h-4 text-blue-400"></i>
-                        <span class="text-[11px] text-zinc-400 truncate" id="video-label">Carica Video (Multipli)</span>
-                        <input type="file" id="video-input" accept="video/*" multiple class="hidden">
+                        <span class="text-[11px] text-zinc-400 truncate" id="video-label">Carica Video</span>
+                        <input type="file" id="video-input" accept="video/*" class="hidden">
                     </label>
-                    <div id="video-files-list" class="text-[9px] text-zinc-500 mt-1"></div>
                 </div>
                 <div class="space-y-1">
-                    <label class="text-[9px] font-black uppercase text-zinc-500">File Audio (Max 20)</label>
+                    <label class="text-[9px] font-black uppercase text-zinc-500">File Audio</label>
                     <label for="audio-input" class="flex items-center gap-3 bg-black border border-zinc-800 p-3 rounded-xl cursor-pointer hover:border-violet-500 transition-all">
                         <i data-lucide="music" class="w-4 h-4 text-violet-400"></i>
-                        <span class="text-[11px] text-zinc-400 truncate" id="audio-label">Carica Audio (Multipli)</span>
-                        <input type="file" id="audio-input" accept="audio/*" multiple class="hidden">
+                        <span class="text-[11px] text-zinc-400 truncate" id="audio-label">Carica Audio (Opzionale)</span>
+                        <input type="file" id="audio-input" accept="audio/*" class="hidden">
                     </label>
-                    <div id="audio-files-list" class="text-[9px] text-zinc-500 mt-1"></div>
                 </div>
             </div>
 
@@ -637,6 +635,15 @@
     <video id="source-video" style="display: none;"></video>
 
     <script>
+        // Wait for DOM to be fully loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded, initializing...');
+            initializeApp();
+        });
+
+        function initializeApp() {
+            console.log('App initialization started');
+            
         lucide.createIcons();
 
         const video = document.getElementById('main-video');
@@ -949,62 +956,33 @@
         };
 
         document.getElementById('video-input').onchange = async (e) => {
-            const files = Array.from(e.target.files);
-            if (files.length === 0) return;
-            
-            console.log('Video files selected:', files.length);
-            
-            if (files.length > MAX_QUEUE_SIZE) {
-                alert(`Puoi caricare massimo ${MAX_QUEUE_SIZE} video!`);
-                videoLibrary = files.slice(0, MAX_QUEUE_SIZE);
-            } else {
-                videoLibrary = files;
-            }
-            
-            console.log('Video library updated:', videoLibrary.length);
-            updateFileLibraryUI();
-            
-            // Load first video automatically
-            if (videoLibrary.length > 0) {
-                console.log('Loading first video...');
-                loadVideoFromLibrary(0);
-                
-                // Show success notification
-                const statusDiv = document.createElement('div');
-                statusDiv.className = 'fixed top-4 right-4 bg-blue-500 text-white px-4 py-2 rounded-lg font-bold text-sm z-50';
-                statusDiv.innerText = `✓ ${videoLibrary.length} video caricati!`;
-                document.body.appendChild(statusDiv);
-                setTimeout(() => statusDiv.remove(), 2000);
+            videoFile = e.target.files[0];
+            if (videoFile) {
+                video.src = URL.createObjectURL(videoFile);
+                document.getElementById('video-label').innerText = videoFile.name;
+                video.onloadedmetadata = () => {
+                    videoDuration = video.duration;
+                    vStart = 0;
+                    vEnd = Math.min(videoDuration, 15);
+                    updateTrimmers();
+                    video.currentTime = vStart;
+                };
+                generateThumbnails(videoFile);
             }
         };
 
         document.getElementById('audio-input').onchange = (e) => {
-            const files = Array.from(e.target.files);
-            if (files.length === 0) return;
-            
-            console.log('Audio files selected:', files.length);
-            
-            if (files.length > MAX_QUEUE_SIZE) {
-                alert(`Puoi caricare massimo ${MAX_QUEUE_SIZE} audio!`);
-                audioLibrary = files.slice(0, MAX_QUEUE_SIZE);
-            } else {
-                audioLibrary = files;
+            audioFile = e.target.files[0];
+            if (audioFile) {
+                audio.src = URL.createObjectURL(audioFile);
+                document.getElementById('audio-label').innerText = audioFile.name;
+                audio.onloadedmetadata = () => {
+                    audioDuration = audio.duration;
+                    drawWaveform(audioFile);
+                    updateTrimmers();
+                    audio.currentTime = aStart;
+                };
             }
-            
-            console.log('Audio library updated:', audioLibrary.length);
-            updateFileLibraryUI();
-            
-            // Show success notification
-            const statusDiv = document.createElement('div');
-            statusDiv.className = 'fixed top-4 right-4 bg-violet-500 text-white px-4 py-2 rounded-lg font-bold text-sm z-50';
-            statusDiv.innerText = `✓ ${audioLibrary.length} audio caricati!`;
-            document.body.appendChild(statusDiv);
-            setTimeout(() => statusDiv.remove(), 2000);
-        };
-
-        // Audio selector change handler
-        document.getElementById('audio-selector').onchange = () => {
-            loadAudioFromSelector();
         };
 
         document.getElementById('play-btn').onclick = () => {
