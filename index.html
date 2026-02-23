@@ -391,34 +391,43 @@
             <!-- Quick Controls Bar (above preview) -->
             <div class="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-3 flex items-center gap-2 flex-wrap backdrop-blur-xl">
                 <!-- Play/Pause -->
-                <button id="play-btn-top" class="w-10 h-10 rounded-xl btn-sv text-white flex items-center justify-center shadow-lg shrink-0">
-                    <i data-lucide="play" id="play-icon-top" class="w-4 h-4 fill-white"></i>
+                <button id="play-btn" class="w-10 h-10 rounded-xl btn-sv text-white flex items-center justify-center shadow-lg shrink-0">
+                    <i data-lucide="play" id="play-icon" class="w-4 h-4 fill-white"></i>
                 </button>
                 <!-- Audio selector -->
                 <select id="audio-selector-top" class="bg-zinc-900 border border-zinc-700 rounded-lg px-2 py-1.5 text-[10px] text-zinc-300 font-bold cursor-pointer hover:border-violet-500 transition-all flex-1 min-w-0">
                     <option value="">No Audio</option>
                 </select>
                 <!-- Prev/Next video -->
-                <button id="prev-video-btn-top" class="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-1 disabled:opacity-30">
+                <button id="prev-video-btn" class="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-1 disabled:opacity-30">
                     <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
                 </button>
-                <button id="next-video-btn-top" class="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-1 disabled:opacity-30">
+                <button id="next-video-btn" class="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-1 disabled:opacity-30">
                     <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
                 </button>
                 <!-- Auto Queue -->
-                <button id="auto-queue-btn-top" class="px-3 py-2 bg-violet-600 hover:bg-violet-500 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-1.5 shadow-lg">
+                <button id="auto-queue-btn" class="px-3 py-2 bg-violet-600 hover:bg-violet-500 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-1.5 shadow-lg">
                     <i data-lucide="zap" class="w-3.5 h-3.5"></i>
                     Auto
                 </button>
                 <!-- Add / Save -->
-                <button id="add-to-queue-btn-top" class="px-3 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-1.5 shadow-lg">
+                <button id="add-to-queue-btn" class="px-3 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-1.5 shadow-lg">
                     <i data-lucide="plus" class="w-3.5 h-3.5"></i>
                     Add
                 </button>
-                <button id="save-queue-btn-top" class="px-3 py-2 bg-green-600 hover:bg-green-500 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-1.5 shadow-lg hidden">
+                <button id="save-queue-btn" class="px-3 py-2 bg-green-600 hover:bg-green-500 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-1.5 shadow-lg hidden">
                     <i data-lucide="save" class="w-3.5 h-3.5"></i>
                     Save
                 </button>
+            </div>
+
+            <!-- Queue List (compact, below top controls) -->
+            <div id="queue-list-wrapper" class="bg-zinc-900/60 border border-zinc-800 rounded-2xl overflow-hidden backdrop-blur-xl hidden">
+                <div class="px-3 py-1.5 border-b border-zinc-800 flex items-center justify-between">
+                    <span class="text-[9px] font-black uppercase text-zinc-500 tracking-widest">Queue</span>
+                    <span id="queue-count" class="text-violet-400 font-mono text-[9px] font-bold uppercase">0/20</span>
+                </div>
+                <div id="queue-list" class="space-y-0.5 max-h-40 overflow-y-auto p-2"></div>
             </div>
 
             <div class="iphone-frame" id="iphone">
@@ -473,7 +482,6 @@
                     <div class="flex items-center gap-3">
                         <div class="text-right">
                             <span id="video-dur-label" class="text-blue-400 font-mono text-xs font-bold uppercase block">Video: 15.0s</span>
-                            <span id="queue-count" class="text-violet-400 font-mono text-[10px] font-bold uppercase">Queue: 0/20</span>
                         </div>
                     </div>
                 </div>
@@ -525,13 +533,12 @@
                     <div class="flex-1 space-y-1">
                         <div class="flex justify-between items-center text-[9px] font-black uppercase text-zinc-500">
                             <span>Audio Waveform (Loop Preview)</span>
-                            <div class="flex items-center gap-2">
-                                <select id="audio-selector" class="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-[9px] text-zinc-300 font-bold cursor-pointer hover:border-violet-500 transition-all">
-                                    <option value="">No Audio</option>
-                                </select>
-                                <span id="audio-start-label">Start: 0.0s</span>
-                            </div>
+                            <span id="audio-start-label">Start: 0.0s</span>
                         </div>
+                        <!-- Hidden selector kept for JS compatibility, selection is done from top bar -->
+                        <select id="audio-selector" class="hidden">
+                            <option value="">No Audio</option>
+                        </select>
                         <div class="trimmer-track h-[70px]" id="a-trimmer-track">
                             <div class="waveform-wrapper">
                                 <canvas id="waveform"></canvas>
@@ -617,36 +624,6 @@
                 </div>
             </div>
 
-            <!-- Bulk Video Queue -->
-            <div class="space-y-3 p-4 bg-gradient-to-br from-blue-950/30 to-violet-950/30 rounded-2xl border border-blue-800/30">
-                <div class="flex items-center justify-between">
-                    <span class="text-[10px] font-black uppercase text-blue-300 tracking-widest">🎬 Bulk Creation</span>
-                    <div class="flex gap-2 flex-wrap justify-end">
-                        <button id="auto-queue-btn" class="px-4 py-2.5 bg-violet-600 hover:bg-violet-500 rounded-xl text-[11px] font-black uppercase transition-all flex items-center gap-2 shadow-lg">
-                            <i data-lucide="zap" class="w-4 h-4"></i>
-                            Auto-Coda
-                        </button>
-                        <button id="save-queue-btn" class="px-4 py-2.5 bg-green-600 hover:bg-green-500 rounded-xl text-[11px] font-black uppercase transition-all flex items-center gap-2 shadow-lg hidden">
-                            <i data-lucide="save" class="w-4 h-4"></i>
-                            Salva
-                        </button>
-                        <button id="prev-video-btn" class="px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-[11px] font-black uppercase transition-all flex items-center gap-2 disabled:opacity-30">
-                            <i data-lucide="chevron-left" class="w-4 h-4"></i>
-                            Prev
-                        </button>
-                        <button id="add-to-queue-btn" class="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-xl text-[11px] font-black uppercase transition-all flex items-center gap-2 shadow-lg">
-                            <i data-lucide="plus" class="w-4 h-4"></i>
-                            Aggiungi
-                        </button>
-                        <button id="next-video-btn" class="px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-[11px] font-black uppercase transition-all flex items-center gap-2 disabled:opacity-30">
-                            Next
-                            <i data-lucide="chevron-right" class="w-4 h-4"></i>
-                        </button>
-                    </div>
-                </div>
-                <div id="queue-list" class="space-y-1 max-h-32 overflow-y-auto"></div>
-            </div>
-
             <div class="grid grid-cols-2 gap-3">
                 <button id="export-btn" class="btn-sv text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 uppercase tracking-widest text-[10px]">
                     <i data-lucide="download" class="w-4 h-4"></i> Export Single Video
@@ -675,18 +652,18 @@
     <script>
         lucide.createIcons();
 
-        // ============ TOP BAR BUTTON MIRRORS ============
+        // ============ TOP BAR AUDIO SELECTOR SYNC ============
         function syncTopSaveAdd(saveVisible) {
             if (saveVisible) {
-                document.getElementById('save-queue-btn-top').classList.remove('hidden');
-                document.getElementById('add-to-queue-btn-top').classList.add('hidden');
+                document.getElementById('save-queue-btn').classList.remove('hidden');
+                document.getElementById('add-to-queue-btn').classList.add('hidden');
             } else {
-                document.getElementById('save-queue-btn-top').classList.add('hidden');
-                document.getElementById('add-to-queue-btn-top').classList.remove('hidden');
+                document.getElementById('save-queue-btn').classList.add('hidden');
+                document.getElementById('add-to-queue-btn').classList.remove('hidden');
             }
         }
         function syncTopPlayIcon(isPlaying) {
-            const topIcon = document.getElementById('play-icon-top');
+            const topIcon = document.getElementById('play-icon');
             topIcon.setAttribute('data-lucide', isPlaying ? 'pause' : 'play');
             lucide.createIcons();
         }
@@ -696,20 +673,11 @@
             top.innerHTML = main.innerHTML;
             top.value = main.value;
         }
-        // Defer wiring until after DOM-dependent handlers are defined
-        window.addEventListener('DOMContentLoaded', () => {});
-        // Wire top buttons — they delegate to main controls
-        document.getElementById('play-btn-top').onclick = () => document.getElementById('play-btn').click();
         document.getElementById('audio-selector-top').onchange = function() {
             const main = document.getElementById('audio-selector');
             main.value = this.value;
             main.dispatchEvent(new Event('change'));
         };
-        document.getElementById('prev-video-btn-top').onclick = () => document.getElementById('prev-video-btn').click();
-        document.getElementById('next-video-btn-top').onclick = () => document.getElementById('next-video-btn').click();
-        document.getElementById('auto-queue-btn-top').onclick = () => document.getElementById('auto-queue-btn').click();
-        document.getElementById('add-to-queue-btn-top').onclick = () => document.getElementById('add-to-queue-btn').click();
-        document.getElementById('save-queue-btn-top').onclick = () => document.getElementById('save-queue-btn').click();
         // ============ END TOP BAR ============
 
         const video = document.getElementById('main-video');
@@ -1064,7 +1032,6 @@
             const icon = document.getElementById('play-icon');
             icon.setAttribute('data-lucide', isPlaying ? 'pause' : 'play');
             lucide.createIcons();
-            syncTopPlayIcon(isPlaying);
         }
 
         async function drawWaveform(file) {
@@ -1225,7 +1192,7 @@
                 await new Promise(r => sourceVideo.onloadedmetadata = r);
 
                 const renderCanvas = document.getElementById('render-canvas');
-                const renderCtx = renderCanvas.getContext('2d');
+                const renderCtx = renderCanvas.getContext('2d', { willReadFrequently: true });
                 
                 const targetWidth = 720;
                 const targetHeight = 1280;
@@ -1233,7 +1200,7 @@
                 renderCanvas.width = targetWidth;
                 renderCanvas.height = targetHeight;
 
-                const fps = 30;
+                const fps = 60;
                 const duration = vEnd - vStart;
 
                 statusText.innerText = 'Creating MP4 muxer...';
@@ -1271,10 +1238,10 @@
                 });
 
                 videoEncoder.configure({
-                    codec: 'avc1.42001F',
+                    codec: 'avc1.640028',
                     width: renderCanvas.width,
                     height: renderCanvas.height,
-                    bitrate: 8_000_000,
+                    bitrate: 15_000_000,
                     framerate: fps,
                     avc: { format: 'avc' }
                 });
@@ -1320,34 +1287,18 @@
                         codec: 'mp4a.40.2',
                         sampleRate: 48000,
                         numberOfChannels: 2,
-                        bitrate: 128000
+                        bitrate: 192000
                     });
                 }
 
-                sourceVideo.currentTime = vStart;
-                await new Promise(r => sourceVideo.onseeked = r);
-
-                const totalFrames = Math.ceil(duration * fps);
-                let frameCount = 0;
-
-                const targetSampleRate = 48000;
-                const sourceSampleRate = audioData ? audioData.sampleRate : 48000;
-                const samplesPerFrame = Math.floor(targetSampleRate / fps);
-                let audioSampleOffset = 0;
-
-                // CORREZIONE: Salva la posizione REALE del caption rispetto al video container
+                // Capture caption position before rendering
                 const captionElement = document.getElementById('caption-overlay');
                 const videoContainer = document.getElementById('drop-zone');
-                
-                // Calcola la posizione esatta in pixel relativi al container
                 const containerRect = videoContainer.getBoundingClientRect();
                 const captionRect = captionElement.getBoundingClientRect();
-                
                 const captionPosition = {
                     text: captionElement.innerText,
-                    // Posizione top relativa al container (in pixel)
                     topPx: captionRect.top - containerRect.top,
-                    // Salva anche la larghezza effettiva del caption per mantenere il wrapping
                     maxWidthPx: captionElement.offsetWidth,
                     fontSize: parseInt(captionElement.style.fontSize || '12'),
                     color: captionElement.style.color || '#ffffff',
@@ -1356,144 +1307,182 @@
                     hasOutline: captionElement.classList.contains('text-bold-outline')
                 };
 
-                console.log('Caption position saved:', captionPosition);
-                console.log('Container height:', containerRect.height);
-                console.log('Caption top offset:', captionPosition.topPx);
-                console.log('Caption max width:', captionPosition.maxWidthPx);
+                // SMOOTH FRAME CAPTURE: play video and grab frames via requestVideoFrameCallback
+                // This avoids slow/imprecise seek-per-frame and produces smooth output
+                sourceVideo.currentTime = vStart;
+                await new Promise(r => { sourceVideo.onseeked = r; });
 
-                for (let i = 0; i < totalFrames; i++) {
-                    const timestamp = i / fps;
-                    sourceVideo.currentTime = vStart + timestamp;
-                    await new Promise(r => sourceVideo.onseeked = r);
+                const totalFrames = Math.ceil(duration * fps);
+                let frameCount = 0;
+                let audioSampleOffset = 0;
+                const targetSampleRate = 48000;
+                const sourceSampleRate = audioData ? audioData.sampleRate : 48000;
+                const samplesPerFrame = Math.floor(targetSampleRate / fps);
 
-                    // Applica zoom se removeWatermark è attivo
-                    if (removeWatermark) {
-                        const scale = 1.1;
-                        const scaledWidth = sourceVideo.videoWidth * scale;
-                        const scaledHeight = sourceVideo.videoHeight * scale;
-                        const offsetX = -(scaledWidth - renderCanvas.width) / 2;
-                        const offsetY = -(scaledHeight - renderCanvas.height) / 2;
-                        
-                        renderCtx.drawImage(
-                            sourceVideo,
-                            offsetX,
-                            offsetY,
-                            scaledWidth,
-                            scaledHeight
-                        );
-                    } else {
-                        renderCtx.drawImage(sourceVideo, 0, 0, renderCanvas.width, renderCanvas.height);
-                    }
+                await new Promise((resolve, reject) => {
+                    let capturedFrames = 0;
+                    let rvfcId = null;
 
-                    // Draw caption con posizione corretta e word wrapping
-                    if (captionPosition.text && captionPosition.text !== 'Scrivi il tuo testo') {
-                        // Calcola il scale factor basandosi sull'altezza del container
-                        const previewHeight = videoContainer.offsetHeight;
-                        const exportHeight = renderCanvas.height;
-                        const scaleFactor = exportHeight / previewHeight;
-                        
-                        const scaledFontSize = captionPosition.fontSize * scaleFactor;
-                        const scaledMaxWidth = captionPosition.maxWidthPx * scaleFactor;
+                    function drawCaption() {
+                        if (captionPosition.text && captionPosition.text !== 'Write your text here' && captionPosition.text !== 'Scrivi il tuo testo') {
+                            const previewHeight = videoContainer.offsetHeight;
+                            const exportHeight = renderCanvas.height;
+                            const scaleFactor = exportHeight / previewHeight;
+                            const scaledFontSize = captionPosition.fontSize * scaleFactor;
+                            const scaledMaxWidth = captionPosition.maxWidthPx * scaleFactor;
 
-                        let fontFamily = 'Montserrat';
-                        if (captionPosition.fontClass.includes('font-typewriter')) fontFamily = 'Courier Prime';
-                        else if (captionPosition.fontClass.includes('font-classic')) fontFamily = 'Inter';
-                        else if (captionPosition.fontClass.includes('font-handwriting')) fontFamily = 'Dancing Script';
+                            let fontFamily = 'Montserrat';
+                            if (captionPosition.fontClass.includes('font-typewriter')) fontFamily = 'Courier Prime';
+                            else if (captionPosition.fontClass.includes('font-classic')) fontFamily = 'Inter';
+                            else if (captionPosition.fontClass.includes('font-handwriting')) fontFamily = 'Dancing Script';
 
-                        renderCtx.font = `800 ${scaledFontSize}px ${fontFamily}`;
-                        renderCtx.textAlign = 'center';
-                        renderCtx.textBaseline = 'top';
+                            renderCtx.font = `800 ${scaledFontSize}px ${fontFamily}`;
+                            renderCtx.textAlign = 'center';
+                            renderCtx.textBaseline = 'top';
 
-                        // Funzione per wrappare il testo su più righe
-                        function wrapText(text, maxWidth) {
-                            const words = text.split(' ');
-                            const lines = [];
-                            let currentLine = words[0];
-
-                            for (let i = 1; i < words.length; i++) {
-                                const testLine = currentLine + ' ' + words[i];
-                                const metrics = renderCtx.measureText(testLine);
-                                if (metrics.width > maxWidth) {
-                                    lines.push(currentLine);
-                                    currentLine = words[i];
-                                } else {
-                                    currentLine = testLine;
+                            function wrapText(text, maxWidth) {
+                                const words = text.split(' ');
+                                const lines = [];
+                                let currentLine = words[0];
+                                for (let wi = 1; wi < words.length; wi++) {
+                                    const testLine = currentLine + ' ' + words[wi];
+                                    if (renderCtx.measureText(testLine).width > maxWidth) {
+                                        lines.push(currentLine);
+                                        currentLine = words[wi];
+                                    } else {
+                                        currentLine = testLine;
+                                    }
                                 }
+                                lines.push(currentLine);
+                                return lines;
                             }
-                            lines.push(currentLine);
-                            return lines;
+
+                            const lines = wrapText(captionPosition.text, scaledMaxWidth);
+                            const lineHeight = scaledFontSize * 1.2;
+                            const textY = captionPosition.topPx * scaleFactor;
+
+                            lines.forEach((line, li) => {
+                                const y = textY + (li * lineHeight);
+                                if (captionPosition.hasOutline) {
+                                    renderCtx.strokeStyle = captionPosition.outlineColor;
+                                    renderCtx.lineWidth = Math.max(scaleFactor * 1.5, 3);
+                                    renderCtx.lineJoin = 'round';
+                                    renderCtx.miterLimit = 2;
+                                    renderCtx.strokeText(line, renderCanvas.width / 2, y);
+                                }
+                                renderCtx.fillStyle = captionPosition.color;
+                                renderCtx.fillText(line, renderCanvas.width / 2, y);
+                            });
                         }
-
-                        const lines = wrapText(captionPosition.text, scaledMaxWidth);
-                        const lineHeight = scaledFontSize * 1.2; // 1.2 è simile al line-height: 1.1 del CSS
-                        const textY = captionPosition.topPx * scaleFactor;
-
-                        // Disegna ogni riga
-                        lines.forEach((line, index) => {
-                            const y = textY + (index * lineHeight);
-                            
-                            if (captionPosition.hasOutline) {
-                                renderCtx.strokeStyle = captionPosition.outlineColor;
-                                renderCtx.lineWidth = Math.max(scaleFactor * 1.5, 3);
-                                renderCtx.lineJoin = 'round';
-                                renderCtx.miterLimit = 2;
-                                renderCtx.strokeText(line, renderCanvas.width / 2, y);
-                            }
-
-                            renderCtx.fillStyle = captionPosition.color;
-                            renderCtx.fillText(line, renderCanvas.width / 2, y);
-                        });
                     }
 
-                    const videoFrame = new VideoFrame(renderCanvas, {
-                        timestamp: (i * 1_000_000) / fps
-                    });
-
-                    videoEncoder.encode(videoFrame, { keyFrame: i % 30 === 0 });
-                    videoFrame.close();
-
-                    if (audioEncoder && audioData) {
+                    function encodeAudioFrame(frameIdx) {
+                        if (!audioEncoder || !audioData) return;
                         const resampleRatio = sourceSampleRate / targetSampleRate;
-                        const sourceSamplesNeeded = Math.floor(samplesPerFrame * resampleRatio);
-                        
                         const leftChannel = new Float32Array(samplesPerFrame);
                         const rightChannel = new Float32Array(samplesPerFrame);
-                        
                         for (let j = 0; j < samplesPerFrame; j++) {
-                            const sourceIndex = Math.floor(audioSampleOffset + (j * resampleRatio));
-                            if (sourceIndex < audioData.left.length) {
-                                leftChannel[j] = audioData.left[sourceIndex];
-                                rightChannel[j] = audioData.right[sourceIndex];
-                            } else {
-                                leftChannel[j] = 0;
-                                rightChannel[j] = 0;
-                            }
+                            const srcIdx = Math.floor(audioSampleOffset + (j * resampleRatio));
+                            leftChannel[j] = srcIdx < audioData.left.length ? audioData.left[srcIdx] : 0;
+                            rightChannel[j] = srcIdx < audioData.right.length ? audioData.right[srcIdx] : 0;
                         }
-
                         const audioFrame = new AudioData({
                             format: 'f32-planar',
                             sampleRate: targetSampleRate,
                             numberOfFrames: samplesPerFrame,
                             numberOfChannels: 2,
-                            timestamp: (i * 1_000_000) / fps,
+                            timestamp: (frameIdx * 1_000_000) / fps,
                             data: new Float32Array([...leftChannel, ...rightChannel])
                         });
-
                         audioEncoder.encode(audioFrame);
                         audioFrame.close();
-                        
-                        audioSampleOffset += sourceSamplesNeeded;
+                        audioSampleOffset += Math.floor(samplesPerFrame * resampleRatio);
                     }
 
-                    frameCount++;
-                    const progressPercent = Math.round((frameCount / totalFrames) * 100);
-                    progress.style.width = progressPercent + '%';
-                    percentText.innerText = progressPercent + '%';
+                    function onVideoFrame(now, metadata) {
+                        if (capturedFrames >= totalFrames) {
+                            resolve();
+                            return;
+                        }
 
-                    if (i % 10 === 0) {
-                        await new Promise(r => setTimeout(r, 0));
+                        // Draw video frame
+                        if (removeWatermark) {
+                            const scale = 1.1;
+                            const sw = sourceVideo.videoWidth * scale;
+                            const sh = sourceVideo.videoHeight * scale;
+                            renderCtx.drawImage(sourceVideo, -(sw - renderCanvas.width) / 2, -(sh - renderCanvas.height) / 2, sw, sh);
+                        } else {
+                            renderCtx.drawImage(sourceVideo, 0, 0, renderCanvas.width, renderCanvas.height);
+                        }
+                        drawCaption();
+
+                        const videoFrame = new VideoFrame(renderCanvas, {
+                            timestamp: (capturedFrames * 1_000_000) / fps
+                        });
+                        videoEncoder.encode(videoFrame, { keyFrame: capturedFrames % 60 === 0 });
+                        videoFrame.close();
+
+                        encodeAudioFrame(capturedFrames);
+
+                        capturedFrames++;
+                        frameCount = capturedFrames;
+
+                        const progressPercent = Math.round((capturedFrames / totalFrames) * 100);
+                        progress.style.width = progressPercent + '%';
+                        percentText.innerText = progressPercent + '%';
+
+                        // Check if we've captured all needed frames
+                        if (capturedFrames >= totalFrames) {
+                            sourceVideo.pause();
+                            resolve();
+                            return;
+                        }
+
+                        rvfcId = sourceVideo.requestVideoFrameCallback(onVideoFrame);
                     }
-                }
+
+                    // If browser supports requestVideoFrameCallback, use it for smooth capture
+                    if ('requestVideoFrameCallback' in HTMLVideoElement.prototype) {
+                        sourceVideo.playbackRate = 1.0;
+                        rvfcId = sourceVideo.requestVideoFrameCallback(onVideoFrame);
+                        sourceVideo.play().catch(reject);
+                    } else {
+                        // Fallback: seek-per-frame (less smooth but universal)
+                        (async () => {
+                            try {
+                                for (let i = 0; i < totalFrames; i++) {
+                                    sourceVideo.currentTime = vStart + (i / fps);
+                                    await new Promise(r => { sourceVideo.onseeked = r; });
+
+                                    if (removeWatermark) {
+                                        const scale = 1.1;
+                                        const sw = sourceVideo.videoWidth * scale;
+                                        const sh = sourceVideo.videoHeight * scale;
+                                        renderCtx.drawImage(sourceVideo, -(sw - renderCanvas.width) / 2, -(sh - renderCanvas.height) / 2, sw, sh);
+                                    } else {
+                                        renderCtx.drawImage(sourceVideo, 0, 0, renderCanvas.width, renderCanvas.height);
+                                    }
+                                    drawCaption();
+
+                                    const videoFrame = new VideoFrame(renderCanvas, { timestamp: (i * 1_000_000) / fps });
+                                    videoEncoder.encode(videoFrame, { keyFrame: i % 60 === 0 });
+                                    videoFrame.close();
+                                    encodeAudioFrame(i);
+
+                                    frameCount = i + 1;
+                                    const p = Math.round(((i + 1) / totalFrames) * 100);
+                                    progress.style.width = p + '%';
+                                    percentText.innerText = p + '%';
+
+                                    if (i % 5 === 0) await new Promise(r => setTimeout(r, 0));
+                                }
+                                resolve();
+                            } catch (e) { reject(e); }
+                        })();
+                    }
+                });
+
+
 
                 statusText.innerText = 'Finalizing MP4...';
                 await videoEncoder.flush();
@@ -1549,10 +1538,12 @@
             const exportAllBtn = document.getElementById('export-all-btn');
             const prevBtn = document.getElementById('prev-video-btn');
             const nextBtn = document.getElementById('next-video-btn');
+            const wrapper = document.getElementById('queue-list-wrapper');
             
-            queueCount.innerText = `Queue: ${videoQueue.length}/20`;
+            queueCount.innerText = `${videoQueue.length}/20`;
             exportCount.innerText = videoQueue.length;
             exportAllBtn.disabled = videoQueue.length === 0;
+            wrapper.classList.toggle('hidden', videoQueue.length === 0);
             
             if (videoQueue.length === 0) {
                 queueList.innerHTML = '<div class="text-center text-zinc-500 text-[10px] py-4">No videos in queue</div>';
@@ -2049,7 +2040,7 @@
                     await new Promise(r => sourceVideo.onloadedmetadata = r);
 
                     const renderCanvas = document.getElementById('render-canvas');
-                    const renderCtx = renderCanvas.getContext('2d');
+                    const renderCtx = renderCanvas.getContext('2d', { willReadFrequently: true });
                     
                     const targetWidth = 720;
                     const targetHeight = 1280;
@@ -2057,7 +2048,7 @@
                     renderCanvas.width = targetWidth;
                     renderCanvas.height = targetHeight;
 
-                    const fps = 30;
+                    const fps = 60;
                     const duration = item.vEnd - item.vStart;
 
                     const { Muxer, ArrayBufferTarget } = window.Mp4Muxer;
@@ -2091,10 +2082,10 @@
                     });
 
                     videoEncoder.configure({
-                        codec: 'avc1.42001F',
+                        codec: 'avc1.640028',
                         width: renderCanvas.width,
                         height: renderCanvas.height,
-                        bitrate: 8_000_000,
+                        bitrate: 15_000_000,
                         framerate: fps,
                         avc: { format: 'avc' }
                     });
@@ -2137,12 +2128,12 @@
                             codec: 'mp4a.40.2',
                             sampleRate: 48000,
                             numberOfChannels: 2,
-                            bitrate: 128000
+                            bitrate: 192000
                         });
                     }
 
                     sourceVideo.currentTime = item.vStart;
-                    await new Promise(r => sourceVideo.onseeked = r);
+                    await new Promise(r => { sourceVideo.onseeked = r; });
 
                     const totalFrames = Math.ceil(duration * fps);
                     const targetSampleRate = 48000;
@@ -2150,69 +2141,38 @@
                     const samplesPerFrame = Math.floor(targetSampleRate / fps);
                     let audioSampleOffset = 0;
 
-                    // Container height for scaling (using a standard preview height)
-                    const previewHeight = 515; // Standard preview container height
+                    const previewHeight = 515;
                     const exportHeight = renderCanvas.height;
                     const scaleFactor = exportHeight / previewHeight;
 
-                    for (let i = 0; i < totalFrames; i++) {
-                        const timestamp = i / fps;
-                        sourceVideo.currentTime = item.vStart + timestamp;
-                        await new Promise(r => sourceVideo.onseeked = r);
-
-                        // Draw video with optional zoom
-                        if (item.removeWatermark) {
-                            const scale = 1.1;
-                            const scaledWidth = sourceVideo.videoWidth * scale;
-                            const scaledHeight = sourceVideo.videoHeight * scale;
-                            const offsetX = -(scaledWidth - renderCanvas.width) / 2;
-                            const offsetY = -(scaledHeight - renderCanvas.height) / 2;
-                            
-                            renderCtx.drawImage(sourceVideo, offsetX, offsetY, scaledWidth, scaledHeight);
-                        } else {
-                            renderCtx.drawImage(sourceVideo, 0, 0, renderCanvas.width, renderCanvas.height);
-                        }
-
-                        // Draw caption with word wrapping
+                    function drawBulkCaption() {
                         if (item.caption && item.caption !== 'Scrivi il tuo testo') {
                             const scaledFontSize = item.fontSize * scaleFactor;
                             const scaledMaxWidth = item.captionMaxWidthPx * scaleFactor;
-
                             let fontFamily = 'Montserrat';
                             if (item.fontClass.includes('font-typewriter')) fontFamily = 'Courier Prime';
                             else if (item.fontClass.includes('font-classic')) fontFamily = 'Inter';
                             else if (item.fontClass.includes('font-handwriting')) fontFamily = 'Dancing Script';
-
                             renderCtx.font = `800 ${scaledFontSize}px ${fontFamily}`;
                             renderCtx.textAlign = 'center';
                             renderCtx.textBaseline = 'top';
-
-                            function wrapText(text, maxWidth) {
-                                const words = text.split(' ');
-                                const lines = [];
-                                let currentLine = words[0];
-
-                                for (let i = 1; i < words.length; i++) {
-                                    const testLine = currentLine + ' ' + words[i];
-                                    const metrics = renderCtx.measureText(testLine);
-                                    if (metrics.width > maxWidth) {
-                                        lines.push(currentLine);
-                                        currentLine = words[i];
-                                    } else {
-                                        currentLine = testLine;
-                                    }
+                            const words = item.caption.split(' ');
+                            const lines = [];
+                            let currentLine = words[0];
+                            for (let wi = 1; wi < words.length; wi++) {
+                                const testLine = currentLine + ' ' + words[wi];
+                                if (renderCtx.measureText(testLine).width > scaledMaxWidth) {
+                                    lines.push(currentLine);
+                                    currentLine = words[wi];
+                                } else {
+                                    currentLine = testLine;
                                 }
-                                lines.push(currentLine);
-                                return lines;
                             }
-
-                            const lines = wrapText(item.caption, scaledMaxWidth);
+                            lines.push(currentLine);
                             const lineHeight = scaledFontSize * 1.2;
                             const textY = item.captionTopPx * scaleFactor;
-
-                            lines.forEach((line, index) => {
-                                const y = textY + (index * lineHeight);
-                                
+                            lines.forEach((line, li) => {
+                                const y = textY + (li * lineHeight);
                                 if (item.hasOutline) {
                                     renderCtx.strokeStyle = item.outlineColor;
                                     renderCtx.lineWidth = Math.max(scaleFactor * 1.5, 3);
@@ -2220,60 +2180,98 @@
                                     renderCtx.miterLimit = 2;
                                     renderCtx.strokeText(line, renderCanvas.width / 2, y);
                                 }
-
                                 renderCtx.fillStyle = item.textColor;
                                 renderCtx.fillText(line, renderCanvas.width / 2, y);
                             });
                         }
-
-                        const videoFrame = new VideoFrame(renderCanvas, {
-                            timestamp: (i * 1_000_000) / fps
-                        });
-
-                        videoEncoder.encode(videoFrame, { keyFrame: i % 30 === 0 });
-                        videoFrame.close();
-
-                        if (audioEncoder && audioData) {
-                            const resampleRatio = sourceSampleRate / targetSampleRate;
-                            const sourceSamplesNeeded = Math.floor(samplesPerFrame * resampleRatio);
-                            
-                            const leftChannel = new Float32Array(samplesPerFrame);
-                            const rightChannel = new Float32Array(samplesPerFrame);
-                            
-                            for (let j = 0; j < samplesPerFrame; j++) {
-                                const sourceIndex = Math.floor(audioSampleOffset + (j * resampleRatio));
-                                if (sourceIndex < audioData.left.length) {
-                                    leftChannel[j] = audioData.left[sourceIndex];
-                                    rightChannel[j] = audioData.right[sourceIndex];
-                                } else {
-                                    leftChannel[j] = 0;
-                                    rightChannel[j] = 0;
-                                }
-                            }
-
-                            const audioFrame = new AudioData({
-                                format: 'f32-planar',
-                                sampleRate: targetSampleRate,
-                                numberOfFrames: samplesPerFrame,
-                                numberOfChannels: 2,
-                                timestamp: (i * 1_000_000) / fps,
-                                data: new Float32Array([...leftChannel, ...rightChannel])
-                            });
-
-                            audioEncoder.encode(audioFrame);
-                            audioFrame.close();
-                            
-                            audioSampleOffset += sourceSamplesNeeded;
-                        }
-
-                        const progressPercent = Math.round((i / totalFrames) * 100);
-                        progress.style.width = progressPercent + '%';
-                        percentText.innerText = progressPercent + '%';
-
-                        if (i % 10 === 0) {
-                            await new Promise(r => setTimeout(r, 0));
-                        }
                     }
+
+                    function encodeBulkAudioFrame(frameIdx) {
+                        if (!audioEncoder || !audioData) return;
+                        const resampleRatio = sourceSampleRate / targetSampleRate;
+                        const leftChannel = new Float32Array(samplesPerFrame);
+                        const rightChannel = new Float32Array(samplesPerFrame);
+                        for (let j = 0; j < samplesPerFrame; j++) {
+                            const srcIdx = Math.floor(audioSampleOffset + (j * resampleRatio));
+                            leftChannel[j] = srcIdx < audioData.left.length ? audioData.left[srcIdx] : 0;
+                            rightChannel[j] = srcIdx < audioData.right.length ? audioData.right[srcIdx] : 0;
+                        }
+                        const audioFrame = new AudioData({
+                            format: 'f32-planar',
+                            sampleRate: targetSampleRate,
+                            numberOfFrames: samplesPerFrame,
+                            numberOfChannels: 2,
+                            timestamp: (frameIdx * 1_000_000) / fps,
+                            data: new Float32Array([...leftChannel, ...rightChannel])
+                        });
+                        audioEncoder.encode(audioFrame);
+                        audioFrame.close();
+                        audioSampleOffset += Math.floor(samplesPerFrame * resampleRatio);
+                    }
+
+                    await new Promise((resolve, reject) => {
+                        let capturedFrames = 0;
+
+                        function onBulkVideoFrame(now, metadata) {
+                            if (capturedFrames >= totalFrames) { resolve(); return; }
+
+                            if (item.removeWatermark) {
+                                const scale = 1.1;
+                                const sw = sourceVideo.videoWidth * scale;
+                                const sh = sourceVideo.videoHeight * scale;
+                                renderCtx.drawImage(sourceVideo, -(sw - renderCanvas.width) / 2, -(sh - renderCanvas.height) / 2, sw, sh);
+                            } else {
+                                renderCtx.drawImage(sourceVideo, 0, 0, renderCanvas.width, renderCanvas.height);
+                            }
+                            drawBulkCaption();
+
+                            const videoFrame = new VideoFrame(renderCanvas, { timestamp: (capturedFrames * 1_000_000) / fps });
+                            videoEncoder.encode(videoFrame, { keyFrame: capturedFrames % 60 === 0 });
+                            videoFrame.close();
+                            encodeBulkAudioFrame(capturedFrames);
+
+                            capturedFrames++;
+                            const p = Math.round((capturedFrames / totalFrames) * 100);
+                            progress.style.width = p + '%';
+                            percentText.innerText = p + '%';
+
+                            if (capturedFrames >= totalFrames) { sourceVideo.pause(); resolve(); return; }
+                            sourceVideo.requestVideoFrameCallback(onBulkVideoFrame);
+                        }
+
+                        if ('requestVideoFrameCallback' in HTMLVideoElement.prototype) {
+                            sourceVideo.requestVideoFrameCallback(onBulkVideoFrame);
+                            sourceVideo.play().catch(reject);
+                        } else {
+                            (async () => {
+                                try {
+                                    for (let i = 0; i < totalFrames; i++) {
+                                        sourceVideo.currentTime = item.vStart + (i / fps);
+                                        await new Promise(r => { sourceVideo.onseeked = r; });
+                                        if (item.removeWatermark) {
+                                            const scale = 1.1;
+                                            const sw = sourceVideo.videoWidth * scale;
+                                            const sh = sourceVideo.videoHeight * scale;
+                                            renderCtx.drawImage(sourceVideo, -(sw - renderCanvas.width) / 2, -(sh - renderCanvas.height) / 2, sw, sh);
+                                        } else {
+                                            renderCtx.drawImage(sourceVideo, 0, 0, renderCanvas.width, renderCanvas.height);
+                                        }
+                                        drawBulkCaption();
+                                        const vf = new VideoFrame(renderCanvas, { timestamp: (i * 1_000_000) / fps });
+                                        videoEncoder.encode(vf, { keyFrame: i % 60 === 0 });
+                                        vf.close();
+                                        encodeBulkAudioFrame(i);
+                                        const p = Math.round(((i + 1) / totalFrames) * 100);
+                                        progress.style.width = p + '%';
+                                        percentText.innerText = p + '%';
+                                        if (i % 5 === 0) await new Promise(r => setTimeout(r, 0));
+                                    }
+                                    resolve();
+                                } catch (e) { reject(e); }
+                            })();
+                        }
+                    });
+
 
                     await videoEncoder.flush();
                     if (audioEncoder) await audioEncoder.flush();
