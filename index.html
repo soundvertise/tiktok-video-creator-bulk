@@ -1276,11 +1276,16 @@
                 const videoContainer = document.getElementById('drop-zone');
                 const containerRect = videoContainer.getBoundingClientRect();
                 const captionRect = captionElement.getBoundingClientRect();
+                const captionContainerEl = document.getElementById('drop-zone');
                 const captionPosition = {
                     text: captionElement.innerText,
-                    topPx: captionRect.top - containerRect.top,
-                    maxWidthPx: captionElement.offsetWidth,
+                    // Store position & width as RATIOS of the preview container, not absolute px
+                    // This ensures perfect pixel-accurate scaling to any export resolution
+                    topRatio: (captionRect.top - containerRect.top) / containerRect.height,
+                    widthRatio: captionElement.offsetWidth / captionContainerEl.offsetWidth,
                     fontSize: parseInt(captionElement.style.fontSize || '12'),
+                    // Also store fontSize as ratio of container height for accurate scaling
+                    fontSizeRatio: parseInt(captionElement.style.fontSize || '12') / captionContainerEl.offsetHeight,
                     color: captionElement.style.color || '#ffffff',
                     outlineColor: getComputedStyle(captionElement).getPropertyValue('--outline-color') || '#000000',
                     fontClass: captionElement.className,
@@ -1304,11 +1309,9 @@
 
                     function drawCaption() {
                         if (captionPosition.text && captionPosition.text !== 'Write your text here' && captionPosition.text !== 'Scrivi il tuo testo') {
-                            const previewHeight = videoContainer.offsetHeight;
-                            const exportHeight = renderCanvas.height;
-                            const scaleFactor = exportHeight / previewHeight;
-                            const scaledFontSize = captionPosition.fontSize * scaleFactor;
-                            const scaledMaxWidth = captionPosition.maxWidthPx * scaleFactor;
+                            // Use ratios for pixel-perfect scaling at any resolution
+                            const scaledFontSize = captionPosition.fontSizeRatio * renderCanvas.height;
+                            const scaledMaxWidth = captionPosition.widthRatio * renderCanvas.width;
 
                             let fontFamily = 'Montserrat';
                             if (captionPosition.fontClass.includes('font-typewriter')) fontFamily = 'Courier Prime';
@@ -1338,7 +1341,7 @@
 
                             const lines = wrapText(captionPosition.text, scaledMaxWidth);
                             const lineHeight = scaledFontSize * 1.2;
-                            const textY = captionPosition.topPx * scaleFactor;
+                            const textY = captionPosition.topRatio * renderCanvas.height;
 
                             lines.forEach((line, li) => {
                                 const y = textY + (li * lineHeight);
@@ -1390,10 +1393,13 @@
 
                         // Draw video frame
                         if (removeWatermark) {
-                            const scale = 1.1;
-                            const sw = sourceVideo.videoWidth * scale;
-                            const sh = sourceVideo.videoHeight * scale;
-                            renderCtx.drawImage(sourceVideo, -(sw - renderCanvas.width) / 2, -(sh - renderCanvas.height) / 2, sw, sh);
+                            // Cover canvas first, then zoom 1.1x to cut watermark
+                            const scaleX = renderCanvas.width / sourceVideo.videoWidth;
+                            const scaleY = renderCanvas.height / sourceVideo.videoHeight;
+                            const coverScale = Math.max(scaleX, scaleY) * 1.1;
+                            const sw = sourceVideo.videoWidth * coverScale;
+                            const sh = sourceVideo.videoHeight * coverScale;
+                            renderCtx.drawImage(sourceVideo, (renderCanvas.width - sw) / 2, (renderCanvas.height - sh) / 2, sw, sh);
                         } else {
                             renderCtx.drawImage(sourceVideo, 0, 0, renderCanvas.width, renderCanvas.height);
                         }
@@ -1552,11 +1558,12 @@
                     aStart: aStart,
                     hasAudio: !!audioFile,
                     
-                    // Caption data
+                    // Caption data — stored as ratios for resolution-independent export
                     caption: captionElement.innerText,
-                    captionTopPx: captionRect.top - containerRect.top,
-                    captionMaxWidthPx: captionElement.offsetWidth,
+                    captionTopRatio: (captionRect.top - containerRect.top) / containerRect.height,
+                    captionWidthRatio: captionElement.offsetWidth / videoContainer.offsetWidth,
                     fontSize: parseInt(captionElement.style.fontSize || '12'),
+                    fontSizeRatio: parseInt(captionElement.style.fontSize || '12') / videoContainer.offsetHeight,
                     textColor: captionElement.style.color || '#ffffff',
                     outlineColor: getComputedStyle(captionElement).getPropertyValue('--outline-color') || '#000000',
                     fontClass: captionElement.className,
@@ -2074,14 +2081,13 @@
                     const samplesPerFrame = Math.floor(targetSampleRate / fps);
                     let audioSampleOffset = 0;
 
-                    const previewHeight = 515;
+                    const previewHeight = 515; // kept for reference, ratios used instead
                     const exportHeight = renderCanvas.height;
-                    const scaleFactor = exportHeight / previewHeight;
 
                     function drawBulkCaption() {
                         if (item.caption && item.caption !== 'Scrivi il tuo testo') {
-                            const scaledFontSize = item.fontSize * scaleFactor;
-                            const scaledMaxWidth = item.captionMaxWidthPx * scaleFactor;
+                            const scaledFontSize = item.fontSizeRatio * renderCanvas.height;
+                            const scaledMaxWidth = item.captionWidthRatio * renderCanvas.width;
                             let fontFamily = 'Montserrat';
                             if (item.fontClass.includes('font-typewriter')) fontFamily = 'Courier Prime';
                             else if (item.fontClass.includes('font-classic')) fontFamily = 'Inter';
@@ -2103,7 +2109,7 @@
                             }
                             lines.push(currentLine);
                             const lineHeight = scaledFontSize * 1.2;
-                            const textY = item.captionTopPx * scaleFactor;
+                            const textY = item.captionTopRatio * renderCanvas.height;
                             lines.forEach((line, li) => {
                                 const y = textY + (li * lineHeight);
                                 if (item.hasOutline) {
@@ -2148,10 +2154,12 @@
                         await new Promise(r => { sourceVideo.onseeked = r; });
 
                         if (item.removeWatermark) {
-                            const scale = 1.1;
-                            const sw = sourceVideo.videoWidth * scale;
-                            const sh = sourceVideo.videoHeight * scale;
-                            renderCtx.drawImage(sourceVideo, -(sw - renderCanvas.width) / 2, -(sh - renderCanvas.height) / 2, sw, sh);
+                            const scaleX = renderCanvas.width / sourceVideo.videoWidth;
+                            const scaleY = renderCanvas.height / sourceVideo.videoHeight;
+                            const coverScale = Math.max(scaleX, scaleY) * 1.1;
+                            const sw = sourceVideo.videoWidth * coverScale;
+                            const sh = sourceVideo.videoHeight * coverScale;
+                            renderCtx.drawImage(sourceVideo, (renderCanvas.width - sw) / 2, (renderCanvas.height - sh) / 2, sw, sh);
                         } else {
                             renderCtx.drawImage(sourceVideo, 0, 0, renderCanvas.width, renderCanvas.height);
                         }
