@@ -1153,6 +1153,12 @@
                 return;
             }
 
+            // Pre-flight: check WebCodecs API availability
+            if (typeof VideoEncoder === 'undefined') {
+                alert('WebCodecs API not available. Please use Chrome 94+ or Edge 94+.');
+                return;
+            }
+
             const exportBtn = document.getElementById('export-btn');
             exportBtn.disabled = true;
             
@@ -1172,7 +1178,7 @@
                 await new Promise(r => sourceVideo.onloadedmetadata = r);
 
                 const renderCanvas = document.getElementById('render-canvas');
-                const renderCtx = renderCanvas.getContext('2d', { willReadFrequently: true });
+                const renderCtx = renderCanvas.getContext('2d');
                 
                 const targetWidth = 1080;
                 const targetHeight = 1920;
@@ -1325,124 +1331,92 @@
                 const sourceSampleRate = audioData ? audioData.sampleRate : 48000;
                 const samplesPerFrame = Math.floor(targetSampleRate / fps);
 
-                {
-                    let capturedFrames = 0;
-
-                    function drawCaption() {
-                        if (captionPosition.text && captionPosition.text !== 'Write your text here' && captionPosition.text !== 'Scrivi il tuo testo') {
-                            // Use ratios for pixel-perfect scaling at any resolution
-                            const scaledFontSize = captionPosition.fontSizeRatio * renderCanvas.height;
-                            const scaledMaxWidth = captionPosition.widthRatio * renderCanvas.width;
-
-                            let fontFamily = 'Montserrat';
-                            if (captionPosition.fontClass.includes('font-typewriter')) fontFamily = 'Courier Prime';
-                            else if (captionPosition.fontClass.includes('font-classic')) fontFamily = 'Inter';
-                            else if (captionPosition.fontClass.includes('font-handwriting')) fontFamily = 'Dancing Script';
-
-                            renderCtx.font = `800 ${scaledFontSize}px ${fontFamily}`;
-                            renderCtx.textAlign = 'center';
-                            renderCtx.textBaseline = 'top';
-
-                            function wrapText(text, maxWidth) {
-                                const words = text.split(' ');
-                                const lines = [];
-                                let currentLine = words[0];
-                                for (let wi = 1; wi < words.length; wi++) {
-                                    const testLine = currentLine + ' ' + words[wi];
-                                    if (renderCtx.measureText(testLine).width > maxWidth) {
-                                        lines.push(currentLine);
-                                        currentLine = words[wi];
-                                    } else {
-                                        currentLine = testLine;
-                                    }
-                                }
-                                lines.push(currentLine);
-                                return lines;
-                            }
-
-                            const lines = wrapText(captionPosition.text, scaledMaxWidth);
-                            const lineHeight = scaledFontSize * 1.2;
-                            const textY = captionPosition.topRatio * renderCanvas.height;
-
-                            lines.forEach((line, li) => {
-                                const y = textY + (li * lineHeight);
-                                if (captionPosition.hasOutline) {
-                                    renderCtx.strokeStyle = captionPosition.outlineColor;
-                                    renderCtx.lineWidth = Math.max(scaleFactor * 1.5, 3);
-                                    renderCtx.lineJoin = 'round';
-                                    renderCtx.miterLimit = 2;
-                                    renderCtx.strokeText(line, renderCanvas.width / 2, y);
-                                }
-                                renderCtx.fillStyle = captionPosition.color;
-                                renderCtx.fillText(line, renderCanvas.width / 2, y);
-                            });
+                const drawCaption = () => {
+                    if (!captionPosition.text || captionPosition.text === 'Write your text here') return;
+                    const scaledFontSize = captionPosition.fontSizeRatio * renderCanvas.height;
+                    const scaledMaxWidth = captionPosition.widthRatio * renderCanvas.width;
+                    let fontFamily = 'Montserrat';
+                    if (captionPosition.fontClass.includes('font-typewriter')) fontFamily = 'Courier Prime';
+                    else if (captionPosition.fontClass.includes('font-classic')) fontFamily = 'Inter';
+                    else if (captionPosition.fontClass.includes('font-handwriting')) fontFamily = 'Dancing Script';
+                    renderCtx.font = `800 ${scaledFontSize}px ${fontFamily}`;
+                    renderCtx.textAlign = 'center';
+                    renderCtx.textBaseline = 'top';
+                    const words = captionPosition.text.split(' ');
+                    const lines = [];
+                    let cur = words[0] || '';
+                    for (let wi = 1; wi < words.length; wi++) {
+                        const test = cur + ' ' + words[wi];
+                        if (renderCtx.measureText(test).width > scaledMaxWidth) { lines.push(cur); cur = words[wi]; }
+                        else cur = test;
+                    }
+                    lines.push(cur);
+                    const lineHeight = scaledFontSize * 1.2;
+                    const textY = captionPosition.topRatio * renderCanvas.height;
+                    lines.forEach((line, li) => {
+                        const y = textY + li * lineHeight;
+                        if (captionPosition.hasOutline) {
+                            renderCtx.strokeStyle = captionPosition.outlineColor;
+                            renderCtx.lineWidth = 4;
+                            renderCtx.lineJoin = 'round';
+                            renderCtx.strokeText(line, renderCanvas.width / 2, y);
                         }
+                        renderCtx.fillStyle = captionPosition.color;
+                        renderCtx.fillText(line, renderCanvas.width / 2, y);
+                    });
+                };
+
+                const encodeAudioFrame = (frameIdx) => {
+                    if (!audioEncoder || !audioData) return;
+                    const resampleRatio = sourceSampleRate / targetSampleRate;
+                    const left = new Float32Array(samplesPerFrame);
+                    const right = new Float32Array(samplesPerFrame);
+                    for (let j = 0; j < samplesPerFrame; j++) {
+                        const si = Math.floor(audioSampleOffset + j * resampleRatio);
+                        left[j] = si < audioData.left.length ? audioData.left[si] : 0;
+                        right[j] = si < audioData.right.length ? audioData.right[si] : 0;
                     }
+                    const af = new AudioData({
+                        format: 'f32-planar', sampleRate: targetSampleRate,
+                        numberOfFrames: samplesPerFrame, numberOfChannels: 2,
+                        timestamp: (frameIdx * 1_000_000) / fps,
+                        data: new Float32Array([...left, ...right])
+                    });
+                    audioEncoder.encode(af);
+                    af.close();
+                    audioSampleOffset += Math.floor(samplesPerFrame * resampleRatio);
+                };
 
-                    function encodeAudioFrame(frameIdx) {
-                        if (!audioEncoder || !audioData) return;
-                        const resampleRatio = sourceSampleRate / targetSampleRate;
-                        const leftChannel = new Float32Array(samplesPerFrame);
-                        const rightChannel = new Float32Array(samplesPerFrame);
-                        for (let j = 0; j < samplesPerFrame; j++) {
-                            const srcIdx = Math.floor(audioSampleOffset + (j * resampleRatio));
-                            leftChannel[j] = srcIdx < audioData.left.length ? audioData.left[srcIdx] : 0;
-                            rightChannel[j] = srcIdx < audioData.right.length ? audioData.right[srcIdx] : 0;
-                        }
-                        const audioFrame = new AudioData({
-                            format: 'f32-planar',
-                            sampleRate: targetSampleRate,
-                            numberOfFrames: samplesPerFrame,
-                            numberOfChannels: 2,
-                            timestamp: (frameIdx * 1_000_000) / fps,
-                            data: new Float32Array([...leftChannel, ...rightChannel])
-                        });
-                        audioEncoder.encode(audioFrame);
-                        audioFrame.close();
-                        audioSampleOffset += Math.floor(samplesPerFrame * resampleRatio);
+                // Frame-by-frame encode
+                for (let i = 0; i < totalFrames; i++) {
+                    sourceVideo.currentTime = vStart + i / fps;
+                    await new Promise(r => { sourceVideo.onseeked = r; });
+
+                    if (removeWatermark) {
+                        const scaleX = renderCanvas.width / sourceVideo.videoWidth;
+                        const scaleY = renderCanvas.height / sourceVideo.videoHeight;
+                        const cs = Math.max(scaleX, scaleY) * 1.1;
+                        const sw = sourceVideo.videoWidth * cs;
+                        const sh = sourceVideo.videoHeight * cs;
+                        renderCtx.drawImage(sourceVideo, (renderCanvas.width - sw) / 2, (renderCanvas.height - sh) / 2, sw, sh);
+                    } else {
+                        renderCtx.drawImage(sourceVideo, 0, 0, renderCanvas.width, renderCanvas.height);
                     }
+                    drawCaption();
 
-                    function onVideoFrame(now, metadata) {
-                        // Not used directly - handled in loop below
-                    }
+                    const vf = new VideoFrame(renderCanvas, { timestamp: (i * 1_000_000) / fps });
+                    videoEncoder.encode(vf, { keyFrame: i % 30 === 0 });
+                    vf.close();
 
-                    // Reliable seek-per-frame capture with high quality settings
-                    // requestVideoFrameCallback causes sync issues; precise seeking is more reliable
-                    for (let i = 0; i < totalFrames; i++) {
-                        sourceVideo.currentTime = vStart + (i / fps);
-                        await new Promise(r => { sourceVideo.onseeked = r; });
+                    encodeAudioFrame(i);
 
-                        // Draw video frame
-                        if (removeWatermark) {
-                            // Cover canvas first, then zoom 1.1x to cut watermark
-                            const scaleX = renderCanvas.width / sourceVideo.videoWidth;
-                            const scaleY = renderCanvas.height / sourceVideo.videoHeight;
-                            const coverScale = Math.max(scaleX, scaleY) * 1.1;
-                            const sw = sourceVideo.videoWidth * coverScale;
-                            const sh = sourceVideo.videoHeight * coverScale;
-                            renderCtx.drawImage(sourceVideo, (renderCanvas.width - sw) / 2, (renderCanvas.height - sh) / 2, sw, sh);
-                        } else {
-                            renderCtx.drawImage(sourceVideo, 0, 0, renderCanvas.width, renderCanvas.height);
-                        }
-                        drawCaption();
+                    frameCount = i + 1;
+                    const pct = Math.round(((i + 1) / totalFrames) * 100);
+                    progress.style.width = pct + '%';
+                    percentText.innerText = pct + '%';
 
-                        const videoFrame = new VideoFrame(renderCanvas, {
-                            timestamp: (i * 1_000_000) / fps
-                        });
-                        videoEncoder.encode(videoFrame, { keyFrame: i % 30 === 0 });
-                        videoFrame.close();
-
-                        encodeAudioFrame(i);
-
-                        frameCount = i + 1;
-
-                        const progressPercent = Math.round(((i + 1) / totalFrames) * 100);
-                        progress.style.width = progressPercent + '%';
-                        percentText.innerText = progressPercent + '%';
-
-                        if (i % 5 === 0) await new Promise(r => setTimeout(r, 0));
-                    }
-                } // end capture block
+                    if (i % 5 === 0) await new Promise(r => setTimeout(r, 0));
+                }
 
                 statusText.innerText = 'Finalizing MP4...';
                 await videoEncoder.flush();
@@ -1469,11 +1443,11 @@
                 }, 2000);
 
             } catch (e) {
-                console.error('Error during l\'export:', e);
-                statusText.innerText = 'Errore: ' + e.message;
-                alert('Error during l\'export. Il tuo browser potrebbe non supportare questa funzionalità. Prova con Chrome o Edge aggiornati.');
+                console.error('Export error:', e);
+                const msg = e?.message || String(e);
+                statusText.innerText = 'Error: ' + msg;
                 percentText.innerText = '';
-                setTimeout(() => status.classList.add('hidden'), 3000);
+                setTimeout(() => status.classList.add('hidden'), 5000);
                 exportBtn.disabled = false;
             }
         };
@@ -2001,7 +1975,7 @@
                     await new Promise(r => sourceVideo.onloadedmetadata = r);
 
                     const renderCanvas = document.getElementById('render-canvas');
-                    const renderCtx = renderCanvas.getContext('2d', { willReadFrequently: true });
+                    const renderCtx = renderCanvas.getContext('2d');
                     
                     const targetWidth = 1080;
                     const targetHeight = 1920;
@@ -2179,9 +2153,9 @@
                         audioEncoder.encode(audioFrame);
                         audioFrame.close();
                         audioSampleOffset += Math.floor(samplesPerFrame * resampleRatio);
-                    }
+                };
 
-                    // Reliable seek-per-frame capture
+                // Reliable seek-per-frame capture
                     for (let i = 0; i < totalFrames; i++) {
                         sourceVideo.currentTime = item.vStart + (i / fps);
                         await new Promise(r => { sourceVideo.onseeked = r; });
