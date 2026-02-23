@@ -1211,20 +1211,41 @@
                 
                 const videoEncoder = new VideoEncoder({
                     output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
-                    error: e => {
-                        console.error('Video encoder error:', e);
-                        throw new Error('Errore di codifica video: ' + e.message);
-                    }
+                    error: e => { console.error('Video encoder error:', e); }
                 });
 
-                videoEncoder.configure({
-                    codec: 'avc1.640028',
-                    width: renderCanvas.width,
-                    height: renderCanvas.height,
-                    bitrate: 25_000_000,
-                    framerate: fps,
-                    avc: { format: 'avc' }
-                });
+                // Try High Profile first, fall back to Baseline for broader compatibility
+                const videoConfigs = [
+                    { codec: 'avc1.640028', bitrate: 25_000_000 }, // High Profile
+                    { codec: 'avc1.4D0028', bitrate: 20_000_000 }, // Main Profile
+                    { codec: 'avc1.42001F', bitrate: 15_000_000 }, // Baseline (always works)
+                ];
+                let configuredVideoCodec = null;
+                for (const cfg of videoConfigs) {
+                    try {
+                        const support = await VideoEncoder.isConfigSupported({
+                            codec: cfg.codec,
+                            width: renderCanvas.width,
+                            height: renderCanvas.height,
+                            bitrate: cfg.bitrate,
+                            framerate: fps,
+                        });
+                        if (support.supported) {
+                            videoEncoder.configure({
+                                codec: cfg.codec,
+                                width: renderCanvas.width,
+                                height: renderCanvas.height,
+                                bitrate: cfg.bitrate,
+                                framerate: fps,
+                                avc: { format: 'avc' }
+                            });
+                            configuredVideoCodec = cfg.codec;
+                            console.log('Using video codec:', cfg.codec, 'bitrate:', cfg.bitrate);
+                            break;
+                        }
+                    } catch(e) { /* try next */ }
+                }
+                if (!configuredVideoCodec) throw new Error('No supported H.264 encoder found in this browser.');
 
                 let audioEncoder = null;
                 let audioContext = null;
@@ -2015,20 +2036,32 @@
                     
                     const videoEncoder = new VideoEncoder({
                         output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
-                        error: e => {
-                            console.error('Video encoder error:', e);
-                            throw new Error('Errore di codifica video: ' + e.message);
-                        }
+                        error: e => { console.error('Video encoder error:', e); }
                     });
 
-                    videoEncoder.configure({
-                        codec: 'avc1.640028',
-                        width: renderCanvas.width,
-                        height: renderCanvas.height,
-                        bitrate: 25_000_000,
-                        framerate: fps,
-                        avc: { format: 'avc' }
-                    });
+                    const videoConfigs2 = [
+                        { codec: 'avc1.640028', bitrate: 25_000_000 },
+                        { codec: 'avc1.4D0028', bitrate: 20_000_000 },
+                        { codec: 'avc1.42001F', bitrate: 15_000_000 },
+                    ];
+                    let configuredVideoCodec2 = null;
+                    for (const cfg of videoConfigs2) {
+                        try {
+                            const support = await VideoEncoder.isConfigSupported({
+                                codec: cfg.codec, width: renderCanvas.width, height: renderCanvas.height,
+                                bitrate: cfg.bitrate, framerate: fps,
+                            });
+                            if (support.supported) {
+                                videoEncoder.configure({
+                                    codec: cfg.codec, width: renderCanvas.width, height: renderCanvas.height,
+                                    bitrate: cfg.bitrate, framerate: fps, avc: { format: 'avc' }
+                                });
+                                configuredVideoCodec2 = cfg.codec;
+                                break;
+                            }
+                        } catch(e) { /* try next */ }
+                    }
+                    if (!configuredVideoCodec2) throw new Error('No supported H.264 encoder found.');
 
                     let audioEncoder = null;
                     let audioData = null;
