@@ -527,8 +527,8 @@
             <!-- Audio Waveform Trimmer -->
             <div class="space-y-3 bg-black p-4 rounded-3xl border border-zinc-800/50">
                 <div class="flex items-center gap-4">
-                    <button id="play-btn" class="w-12 h-12 rounded-xl btn-sv text-white flex items-center justify-center shadow-lg shrink-0">
-                        <i data-lucide="play" id="play-icon" class="w-5 h-5 fill-white"></i>
+                    <button id="play-btn-wave" class="w-12 h-12 rounded-xl btn-sv text-white flex items-center justify-center shadow-lg shrink-0 pointer-events-none opacity-60">
+                        <i data-lucide="play" class="w-5 h-5 fill-white"></i>
                     </button>
                     <div class="flex-1 space-y-1">
                         <div class="flex justify-between items-center text-[9px] font-black uppercase text-zinc-500">
@@ -1031,6 +1031,9 @@
         function updatePlayIcon(isPlaying) {
             const icon = document.getElementById('play-icon');
             icon.setAttribute('data-lucide', isPlaying ? 'pause' : 'play');
+            // Also update waveform section indicator
+            const waveIcon = document.querySelector('#play-btn-wave i');
+            if (waveIcon) waveIcon.setAttribute('data-lucide', isPlaying ? 'pause' : 'play');
             lucide.createIcons();
         }
 
@@ -1319,9 +1322,8 @@
                 const sourceSampleRate = audioData ? audioData.sampleRate : 48000;
                 const samplesPerFrame = Math.floor(targetSampleRate / fps);
 
-                await new Promise((resolve, reject) => {
+                {
                     let capturedFrames = 0;
-                    let rvfcId = null;
 
                     function drawCaption() {
                         if (captionPosition.text && captionPosition.text !== 'Write your text here' && captionPosition.text !== 'Scrivi il tuo testo') {
@@ -1400,10 +1402,14 @@
                     }
 
                     function onVideoFrame(now, metadata) {
-                        if (capturedFrames >= totalFrames) {
-                            resolve();
-                            return;
-                        }
+                        // Not used directly - handled in loop below
+                    }
+
+                    // Reliable seek-per-frame capture with high quality settings
+                    // requestVideoFrameCallback causes sync issues; precise seeking is more reliable
+                    for (let i = 0; i < totalFrames; i++) {
+                        sourceVideo.currentTime = vStart + (i / fps);
+                        await new Promise(r => { sourceVideo.onseeked = r; });
 
                         // Draw video frame
                         if (removeWatermark) {
@@ -1417,72 +1423,22 @@
                         drawCaption();
 
                         const videoFrame = new VideoFrame(renderCanvas, {
-                            timestamp: (capturedFrames * 1_000_000) / fps
+                            timestamp: (i * 1_000_000) / fps
                         });
-                        videoEncoder.encode(videoFrame, { keyFrame: capturedFrames % 60 === 0 });
+                        videoEncoder.encode(videoFrame, { keyFrame: i % 60 === 0 });
                         videoFrame.close();
 
-                        encodeAudioFrame(capturedFrames);
+                        encodeAudioFrame(i);
 
-                        capturedFrames++;
-                        frameCount = capturedFrames;
+                        frameCount = i + 1;
 
-                        const progressPercent = Math.round((capturedFrames / totalFrames) * 100);
+                        const progressPercent = Math.round(((i + 1) / totalFrames) * 100);
                         progress.style.width = progressPercent + '%';
                         percentText.innerText = progressPercent + '%';
 
-                        // Check if we've captured all needed frames
-                        if (capturedFrames >= totalFrames) {
-                            sourceVideo.pause();
-                            resolve();
-                            return;
-                        }
-
-                        rvfcId = sourceVideo.requestVideoFrameCallback(onVideoFrame);
+                        if (i % 5 === 0) await new Promise(r => setTimeout(r, 0));
                     }
-
-                    // If browser supports requestVideoFrameCallback, use it for smooth capture
-                    if ('requestVideoFrameCallback' in HTMLVideoElement.prototype) {
-                        sourceVideo.playbackRate = 1.0;
-                        rvfcId = sourceVideo.requestVideoFrameCallback(onVideoFrame);
-                        sourceVideo.play().catch(reject);
-                    } else {
-                        // Fallback: seek-per-frame (less smooth but universal)
-                        (async () => {
-                            try {
-                                for (let i = 0; i < totalFrames; i++) {
-                                    sourceVideo.currentTime = vStart + (i / fps);
-                                    await new Promise(r => { sourceVideo.onseeked = r; });
-
-                                    if (removeWatermark) {
-                                        const scale = 1.1;
-                                        const sw = sourceVideo.videoWidth * scale;
-                                        const sh = sourceVideo.videoHeight * scale;
-                                        renderCtx.drawImage(sourceVideo, -(sw - renderCanvas.width) / 2, -(sh - renderCanvas.height) / 2, sw, sh);
-                                    } else {
-                                        renderCtx.drawImage(sourceVideo, 0, 0, renderCanvas.width, renderCanvas.height);
-                                    }
-                                    drawCaption();
-
-                                    const videoFrame = new VideoFrame(renderCanvas, { timestamp: (i * 1_000_000) / fps });
-                                    videoEncoder.encode(videoFrame, { keyFrame: i % 60 === 0 });
-                                    videoFrame.close();
-                                    encodeAudioFrame(i);
-
-                                    frameCount = i + 1;
-                                    const p = Math.round(((i + 1) / totalFrames) * 100);
-                                    progress.style.width = p + '%';
-                                    percentText.innerText = p + '%';
-
-                                    if (i % 5 === 0) await new Promise(r => setTimeout(r, 0));
-                                }
-                                resolve();
-                            } catch (e) { reject(e); }
-                        })();
-                    }
-                });
-
-
+                } // end capture block
 
                 statusText.innerText = 'Finalizing MP4...';
                 await videoEncoder.flush();
@@ -2209,68 +2165,32 @@
                         audioSampleOffset += Math.floor(samplesPerFrame * resampleRatio);
                     }
 
-                    await new Promise((resolve, reject) => {
-                        let capturedFrames = 0;
+                    // Reliable seek-per-frame capture
+                    for (let i = 0; i < totalFrames; i++) {
+                        sourceVideo.currentTime = item.vStart + (i / fps);
+                        await new Promise(r => { sourceVideo.onseeked = r; });
 
-                        function onBulkVideoFrame(now, metadata) {
-                            if (capturedFrames >= totalFrames) { resolve(); return; }
-
-                            if (item.removeWatermark) {
-                                const scale = 1.1;
-                                const sw = sourceVideo.videoWidth * scale;
-                                const sh = sourceVideo.videoHeight * scale;
-                                renderCtx.drawImage(sourceVideo, -(sw - renderCanvas.width) / 2, -(sh - renderCanvas.height) / 2, sw, sh);
-                            } else {
-                                renderCtx.drawImage(sourceVideo, 0, 0, renderCanvas.width, renderCanvas.height);
-                            }
-                            drawBulkCaption();
-
-                            const videoFrame = new VideoFrame(renderCanvas, { timestamp: (capturedFrames * 1_000_000) / fps });
-                            videoEncoder.encode(videoFrame, { keyFrame: capturedFrames % 60 === 0 });
-                            videoFrame.close();
-                            encodeBulkAudioFrame(capturedFrames);
-
-                            capturedFrames++;
-                            const p = Math.round((capturedFrames / totalFrames) * 100);
-                            progress.style.width = p + '%';
-                            percentText.innerText = p + '%';
-
-                            if (capturedFrames >= totalFrames) { sourceVideo.pause(); resolve(); return; }
-                            sourceVideo.requestVideoFrameCallback(onBulkVideoFrame);
-                        }
-
-                        if ('requestVideoFrameCallback' in HTMLVideoElement.prototype) {
-                            sourceVideo.requestVideoFrameCallback(onBulkVideoFrame);
-                            sourceVideo.play().catch(reject);
+                        if (item.removeWatermark) {
+                            const scale = 1.1;
+                            const sw = sourceVideo.videoWidth * scale;
+                            const sh = sourceVideo.videoHeight * scale;
+                            renderCtx.drawImage(sourceVideo, -(sw - renderCanvas.width) / 2, -(sh - renderCanvas.height) / 2, sw, sh);
                         } else {
-                            (async () => {
-                                try {
-                                    for (let i = 0; i < totalFrames; i++) {
-                                        sourceVideo.currentTime = item.vStart + (i / fps);
-                                        await new Promise(r => { sourceVideo.onseeked = r; });
-                                        if (item.removeWatermark) {
-                                            const scale = 1.1;
-                                            const sw = sourceVideo.videoWidth * scale;
-                                            const sh = sourceVideo.videoHeight * scale;
-                                            renderCtx.drawImage(sourceVideo, -(sw - renderCanvas.width) / 2, -(sh - renderCanvas.height) / 2, sw, sh);
-                                        } else {
-                                            renderCtx.drawImage(sourceVideo, 0, 0, renderCanvas.width, renderCanvas.height);
-                                        }
-                                        drawBulkCaption();
-                                        const vf = new VideoFrame(renderCanvas, { timestamp: (i * 1_000_000) / fps });
-                                        videoEncoder.encode(vf, { keyFrame: i % 60 === 0 });
-                                        vf.close();
-                                        encodeBulkAudioFrame(i);
-                                        const p = Math.round(((i + 1) / totalFrames) * 100);
-                                        progress.style.width = p + '%';
-                                        percentText.innerText = p + '%';
-                                        if (i % 5 === 0) await new Promise(r => setTimeout(r, 0));
-                                    }
-                                    resolve();
-                                } catch (e) { reject(e); }
-                            })();
+                            renderCtx.drawImage(sourceVideo, 0, 0, renderCanvas.width, renderCanvas.height);
                         }
-                    });
+                        drawBulkCaption();
+
+                        const vf = new VideoFrame(renderCanvas, { timestamp: (i * 1_000_000) / fps });
+                        videoEncoder.encode(vf, { keyFrame: i % 60 === 0 });
+                        vf.close();
+                        encodeBulkAudioFrame(i);
+
+                        const p = Math.round(((i + 1) / totalFrames) * 100);
+                        progress.style.width = p + '%';
+                        percentText.innerText = p + '%';
+
+                        if (i % 5 === 0) await new Promise(r => setTimeout(r, 0));
+                    }
 
 
                     await videoEncoder.flush();
