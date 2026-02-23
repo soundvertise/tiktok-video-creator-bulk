@@ -395,7 +395,9 @@
                     <i data-lucide="play" id="play-icon" class="w-4 h-4 fill-white"></i>
                 </button>
                 <!-- Audio selector -->
-                <select id="audio-selector-top" class="bg-zinc-900 border border-zinc-700 rounded-lg px-2 py-1.5 text-[10px] text-zinc-300 font-bold cursor-pointer hover:border-violet-500 transition-all flex-1 min-w-0">
+                <select id="audio-selector" class="bg-zinc-900 border border-zinc-700 rounded-lg px-2 py-1.5 text-[10px] text-zinc-300 font-bold cursor-pointer hover:border-violet-500 transition-all flex-1 min-w-0">
+                    <option value="">No Audio</option>
+                </select>
                     <option value="">No Audio</option>
                 </select>
                 <!-- Prev/Next video -->
@@ -535,10 +537,7 @@
                             <span>Audio Waveform (Loop Preview)</span>
                             <span id="audio-start-label">Start: 0.0s</span>
                         </div>
-                        <!-- Hidden selector kept for JS compatibility, selection is done from top bar -->
-                        <select id="audio-selector" class="hidden">
-                            <option value="">No Audio</option>
-                        </select>
+
                         <div class="trimmer-track h-[70px]" id="a-trimmer-track">
                             <div class="waveform-wrapper">
                                 <canvas id="waveform"></canvas>
@@ -668,16 +667,8 @@
             lucide.createIcons();
         }
         function syncTopAudioSelector() {
-            const top = document.getElementById('audio-selector-top');
-            const main = document.getElementById('audio-selector');
-            top.innerHTML = main.innerHTML;
-            top.value = main.value;
+            // audio-selector IS the top selector now — no sync needed
         }
-        document.getElementById('audio-selector-top').onchange = function() {
-            const main = document.getElementById('audio-selector');
-            main.value = this.value;
-            main.dispatchEvent(new Event('change'));
-        };
         // ============ END TOP BAR ============
 
         const video = document.getElementById('main-video');
