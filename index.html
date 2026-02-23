@@ -390,14 +390,8 @@
 
             <!-- Quick Controls Bar (above preview) -->
             <div class="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-3 flex items-center gap-2 flex-wrap backdrop-blur-xl">
-                <!-- Play/Pause -->
-                <button id="play-btn" class="w-10 h-10 rounded-xl btn-sv text-white flex items-center justify-center shadow-lg shrink-0">
-                    <i data-lucide="play" id="play-icon" class="w-4 h-4 fill-white"></i>
-                </button>
                 <!-- Audio selector -->
                 <select id="audio-selector" class="bg-zinc-900 border border-zinc-700 rounded-lg px-2 py-1.5 text-[10px] text-zinc-300 font-bold cursor-pointer hover:border-violet-500 transition-all flex-1 min-w-0">
-                    <option value="">No Audio</option>
-                </select>
                     <option value="">No Audio</option>
                 </select>
                 <!-- Prev/Next video -->
@@ -529,8 +523,8 @@
             <!-- Audio Waveform Trimmer -->
             <div class="space-y-3 bg-black p-4 rounded-3xl border border-zinc-800/50">
                 <div class="flex items-center gap-4">
-                    <button id="play-btn-wave" class="w-12 h-12 rounded-xl btn-sv text-white flex items-center justify-center shadow-lg shrink-0 pointer-events-none opacity-60">
-                        <i data-lucide="play" class="w-5 h-5 fill-white"></i>
+                    <button id="play-btn" class="w-12 h-12 rounded-xl btn-sv text-white flex items-center justify-center shadow-lg shrink-0">
+                        <i data-lucide="play" id="play-icon" class="w-5 h-5 fill-white"></i>
                     </button>
                     <div class="flex-1 space-y-1">
                         <div class="flex justify-between items-center text-[9px] font-black uppercase text-zinc-500">
@@ -660,11 +654,6 @@
                 document.getElementById('save-queue-btn').classList.add('hidden');
                 document.getElementById('add-to-queue-btn').classList.remove('hidden');
             }
-        }
-        function syncTopPlayIcon(isPlaying) {
-            const topIcon = document.getElementById('play-icon');
-            topIcon.setAttribute('data-lucide', isPlaying ? 'pause' : 'play');
-            lucide.createIcons();
         }
         function syncTopAudioSelector() {
             // audio-selector IS the top selector now — no sync needed
@@ -1022,9 +1011,6 @@
         function updatePlayIcon(isPlaying) {
             const icon = document.getElementById('play-icon');
             icon.setAttribute('data-lucide', isPlaying ? 'pause' : 'play');
-            // Also update waveform section indicator
-            const waveIcon = document.querySelector('#play-btn-wave i');
-            if (waveIcon) waveIcon.setAttribute('data-lucide', isPlaying ? 'pause' : 'play');
             lucide.createIcons();
         }
 
@@ -1188,13 +1174,13 @@
                 const renderCanvas = document.getElementById('render-canvas');
                 const renderCtx = renderCanvas.getContext('2d', { willReadFrequently: true });
                 
-                const targetWidth = 720;
-                const targetHeight = 1280;
+                const targetWidth = 1080;
+                const targetHeight = 1920;
                 
                 renderCanvas.width = targetWidth;
                 renderCanvas.height = targetHeight;
 
-                const fps = 60;
+                const fps = 30;
                 const duration = vEnd - vStart;
 
                 statusText.innerText = 'Creating MP4 muxer...';
@@ -1235,7 +1221,7 @@
                     codec: 'avc1.640028',
                     width: renderCanvas.width,
                     height: renderCanvas.height,
-                    bitrate: 15_000_000,
+                    bitrate: 25_000_000,
                     framerate: fps,
                     avc: { format: 'avc' }
                 });
@@ -1416,7 +1402,7 @@
                         const videoFrame = new VideoFrame(renderCanvas, {
                             timestamp: (i * 1_000_000) / fps
                         });
-                        videoEncoder.encode(videoFrame, { keyFrame: i % 60 === 0 });
+                        videoEncoder.encode(videoFrame, { keyFrame: i % 30 === 0 });
                         videoFrame.close();
 
                         encodeAudioFrame(i);
@@ -1989,13 +1975,13 @@
                     const renderCanvas = document.getElementById('render-canvas');
                     const renderCtx = renderCanvas.getContext('2d', { willReadFrequently: true });
                     
-                    const targetWidth = 720;
-                    const targetHeight = 1280;
+                    const targetWidth = 1080;
+                    const targetHeight = 1920;
                     
                     renderCanvas.width = targetWidth;
                     renderCanvas.height = targetHeight;
 
-                    const fps = 60;
+                    const fps = 30;
                     const duration = item.vEnd - item.vStart;
 
                     const { Muxer, ArrayBufferTarget } = window.Mp4Muxer;
@@ -2032,7 +2018,7 @@
                         codec: 'avc1.640028',
                         width: renderCanvas.width,
                         height: renderCanvas.height,
-                        bitrate: 15_000_000,
+                        bitrate: 25_000_000,
                         framerate: fps,
                         avc: { format: 'avc' }
                     });
@@ -2172,7 +2158,7 @@
                         drawBulkCaption();
 
                         const vf = new VideoFrame(renderCanvas, { timestamp: (i * 1_000_000) / fps });
-                        videoEncoder.encode(vf, { keyFrame: i % 60 === 0 });
+                        videoEncoder.encode(vf, { keyFrame: i % 30 === 0 });
                         vf.close();
                         encodeBulkAudioFrame(i);
 
