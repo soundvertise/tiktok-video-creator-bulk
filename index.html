@@ -315,6 +315,28 @@
             border-color: var(--sv-purple);
             color: #fff;
         }
+        .audio-fx-btn {
+            background: #0a0a0a;
+            border: 1px solid #2a2a2a;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 8px;
+            font-weight: 800;
+            text-transform: uppercase;
+            transition: all 0.2s;
+            color: #555;
+            cursor: pointer;
+            letter-spacing: 0.05em;
+        }
+        .audio-fx-btn.active {
+            border-color: #06b6d4;
+            background: rgba(6, 182, 212, 0.12);
+            color: #06b6d4;
+        }
+        .audio-fx-btn:hover {
+            border-color: #06b6d4;
+            color: #ccc;
+        }
 
         #render-canvas {
             display: none;
@@ -539,6 +561,18 @@
                             <div id="audio-playhead" class="playhead-cursor" style="left: 0; display: none;"></div>
                             <div id="audio-trim-overlay" class="trim-overlay"></div>
                         </div>
+
+                        <!-- Audio FX -->
+                        <div class="flex gap-1.5 flex-wrap pt-1">
+                            <span class="text-[8px] font-black uppercase text-zinc-600 self-center pr-1">FX:</span>
+                            <button class="audio-fx-btn active" data-fx="none">Normal</button>
+                            <button class="audio-fx-btn" data-fx="slow">🐢 Slow</button>
+                            <button class="audio-fx-btn" data-fx="fast">⚡ Fast</button>
+                            <button class="audio-fx-btn" data-fx="reverb">🌊 Reverb</button>
+                            <button class="audio-fx-btn" data-fx="nightcore">🌙 Nightcore</button>
+                            <button class="audio-fx-btn" data-fx="bass">🔊 Bass Boost</button>
+                            <button class="audio-fx-btn" data-fx="telephone">📞 Lo-Fi</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -748,7 +782,6 @@
             const selectedIndex = parseInt(selector.value);
             
             if (isNaN(selectedIndex) || selectedIndex < 0) {
-                // No audio selected
                 currentAudioIndex = -1;
                 audioFile = null;
                 audio.src = '';
@@ -766,8 +799,214 @@
                 drawWaveform(audioFile);
                 updateTrimmers();
                 audio.currentTime = aStart;
+                // Re-apply current FX when new audio loads
+                applyAudioFX(currentAudioFX);
             };
         }
+
+        // ─── AUDIO FX ENGINE ───────────────────────────────────────────────
+        let fxAudioCtx = null;
+        let fxSource = null;
+        let fxNodes = [];
+        let currentAudioFX = 'none';
+
+        // Generate a simple reverb impulse response
+        function createReverbIR(ctx, duration = 2.5, decay = 3.0) {
+            const rate = ctx.sampleRate;
+            const len = Math.floor(rate * duration);
+            const ir = ctx.createBuffer(2, len, rate);
+            for (let ch = 0; ch < 2; ch++) {
+                const d = ir.getChannelData(ch);
+                for (let i = 0; i < len; i++) {
+                    d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+                }
+            }
+            return ir;
+        }
+
+        async function applyAudioFX(fx) {
+            currentAudioFX = fx;
+            const wasPlaying = !audio.paused;
+            const currentTime = audio.currentTime;
+
+            // Tear down previous Web Audio chain
+            if (fxSource) { try { fxSource.disconnect(); } catch(e) {} fxSource = null; }
+            fxNodes.forEach(n => { try { n.disconnect(); } catch(e) {} });
+            fxNodes = [];
+            if (fxAudioCtx) { try { await fxAudioCtx.close(); } catch(e) {} fxAudioCtx = null; }
+
+            if (fx === 'none' || !audio.src) return;
+
+            // Build new Web Audio context routed through fx
+            fxAudioCtx = new AudioContext();
+            fxSource = fxAudioCtx.createMediaElementSource(audio);
+            let lastNode = fxSource;
+
+            if (fx === 'slow') {
+                audio.playbackRate = 0.75;
+            } else if (fx === 'fast') {
+                audio.playbackRate = 1.5;
+            } else if (fx === 'nightcore') {
+                audio.playbackRate = 1.25;
+                // Pitch shift feel via slight detune on gain
+                const gain = fxAudioCtx.createGain();
+                gain.gain.value = 1.1;
+                lastNode.connect(gain);
+                lastNode = gain;
+                fxNodes.push(gain);
+            } else {
+                audio.playbackRate = 1.0;
+            }
+
+            if (fx === 'reverb') {
+                const convolver = fxAudioCtx.createConvolver();
+                convolver.buffer = createReverbIR(fxAudioCtx);
+                const dry = fxAudioCtx.createGain();
+                const wet = fxAudioCtx.createGain();
+                dry.gain.value = 0.4;
+                wet.gain.value = 0.6;
+                lastNode.connect(dry);
+                lastNode.connect(convolver);
+                convolver.connect(wet);
+                const merger = fxAudioCtx.createGain();
+                dry.connect(merger);
+                wet.connect(merger);
+                lastNode = merger;
+                fxNodes.push(convolver, dry, wet, merger);
+            }
+
+            if (fx === 'bass') {
+                const bass = fxAudioCtx.createBiquadFilter();
+                bass.type = 'lowshelf';
+                bass.frequency.value = 200;
+                bass.gain.value = 12;
+                const cut = fxAudioCtx.createBiquadFilter();
+                cut.type = 'highpass';
+                cut.frequency.value = 40;
+                lastNode.connect(bass);
+                bass.connect(cut);
+                lastNode = cut;
+                fxNodes.push(bass, cut);
+            }
+
+            if (fx === 'telephone') {
+                const hi = fxAudioCtx.createBiquadFilter();
+                hi.type = 'highpass';
+                hi.frequency.value = 800;
+                const lo = fxAudioCtx.createBiquadFilter();
+                lo.type = 'lowpass';
+                lo.frequency.value = 3000;
+                const dist = fxAudioCtx.createWaveShaper();
+                const curve = new Float32Array(256);
+                for (let i = 0; i < 256; i++) {
+                    const x = (i * 2) / 256 - 1;
+                    curve[i] = (Math.PI + 80) * x / (Math.PI + 80 * Math.abs(x));
+                }
+                dist.curve = curve;
+                lastNode.connect(hi);
+                hi.connect(lo);
+                lo.connect(dist);
+                lastNode = dist;
+                fxNodes.push(hi, lo, dist);
+            }
+
+            lastNode.connect(fxAudioCtx.destination);
+
+            // Resume if was playing
+            if (wasPlaying) {
+                audio.currentTime = currentTime;
+                await fxAudioCtx.resume();
+            }
+        }
+
+        // ─── OFFLINE FX PROCESSING (for export) ─────────────────────────
+        async function applyFXOffline(buffer, fx, playbackRate, onlineCtx) {
+            if (fx === 'none') return buffer;
+
+            const rate = buffer.sampleRate;
+            const channels = buffer.numberOfChannels;
+
+            // For speed effects: resample by adjusting length
+            const speedFactor = (fx === 'slow') ? 0.75 : (fx === 'fast') ? 1.5 : (fx === 'nightcore') ? 1.25 : 1.0;
+            const outLength = Math.floor(buffer.length / speedFactor);
+            const offCtx = new OfflineAudioContext(channels, outLength + rate * 3, rate);
+
+            const src = offCtx.createBufferSource();
+            src.buffer = buffer;
+            src.playbackRate.value = speedFactor;
+
+            let lastNode = src;
+
+            if (fx === 'reverb') {
+                const convolver = offCtx.createConvolver();
+                convolver.buffer = createReverbIR(offCtx, 2.5, 3.0);
+                const dry = offCtx.createGain(); dry.gain.value = 0.4;
+                const wet = offCtx.createGain(); wet.gain.value = 0.6;
+                const merger = offCtx.createGain();
+                lastNode.connect(dry); lastNode.connect(convolver);
+                convolver.connect(wet); dry.connect(merger); wet.connect(merger);
+                lastNode = merger;
+            }
+
+            if (fx === 'bass') {
+                const bass = offCtx.createBiquadFilter();
+                bass.type = 'lowshelf'; bass.frequency.value = 200; bass.gain.value = 12;
+                const cut = offCtx.createBiquadFilter();
+                cut.type = 'highpass'; cut.frequency.value = 40;
+                lastNode.connect(bass); bass.connect(cut); lastNode = cut;
+            }
+
+            if (fx === 'telephone') {
+                const hi = offCtx.createBiquadFilter();
+                hi.type = 'highpass'; hi.frequency.value = 800;
+                const lo = offCtx.createBiquadFilter();
+                lo.type = 'lowpass'; lo.frequency.value = 3000;
+                const dist = offCtx.createWaveShaper();
+                const curve = new Float32Array(256);
+                for (let i = 0; i < 256; i++) {
+                    const x = (i * 2) / 256 - 1;
+                    curve[i] = (Math.PI + 80) * x / (Math.PI + 80 * Math.abs(x));
+                }
+                dist.curve = curve;
+                lastNode.connect(hi); hi.connect(lo); lo.connect(dist); lastNode = dist;
+            }
+
+            lastNode.connect(offCtx.destination);
+            src.start(0);
+
+            const rendered = await offCtx.startRendering();
+            // Trim to actual output length
+            const trimLen = Math.min(outLength, rendered.length);
+            const out = onlineCtx.createBuffer(channels, trimLen, rate);
+            for (let ch = 0; ch < channels; ch++) {
+                out.copyToChannel(rendered.getChannelData(ch).slice(0, trimLen), ch);
+            }
+            return out;
+        }
+        // ─── END OFFLINE FX ──────────────────────────────────────────────
+
+        // FX button handlers
+        document.querySelectorAll('.audio-fx-btn').forEach(btn => {
+            btn.onclick = async () => {
+                document.querySelectorAll('.audio-fx-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const fx = btn.dataset.fx;
+                // Reset playback rate for non-speed effects
+                if (fx === 'none' || fx === 'reverb' || fx === 'bass' || fx === 'telephone') {
+                    audio.playbackRate = 1.0;
+                }
+                await applyAudioFX(fx);
+            };
+        });
+
+        // Also store active FX for export
+        function getActiveFXSettings() {
+            return {
+                fx: currentAudioFX,
+                playbackRate: audio.playbackRate
+            };
+        }
+        // ─── END AUDIO FX ENGINE ──────────────────────────────────────────
 
         // Toggle watermark removal
         document.getElementById('toggle-watermark').onclick = function() {
@@ -1262,11 +1501,15 @@
                     
                     audioContext = new AudioContext({ sampleRate: 48000 });
                     const audioBuffer = await audioFile.arrayBuffer();
-                    const decodedAudio = await audioContext.decodeAudioData(audioBuffer);
-                    
+                    let decodedAudio = await audioContext.decodeAudioData(audioBuffer);
+
+                    // Apply FX offline for export
+                    const fxSettings = getActiveFXSettings();
+                    decodedAudio = await applyFXOffline(decodedAudio, fxSettings.fx, fxSettings.playbackRate, audioContext);
+
                     const startSample = Math.floor(aStart * decodedAudio.sampleRate);
                     const endSample = Math.floor((aStart + duration) * decodedAudio.sampleRate);
-                    const sampleCount = endSample - startSample;
+                    const sampleCount = Math.max(0, endSample - startSample);
                     
                     audioData = {
                         left: new Float32Array(sampleCount),
@@ -1284,10 +1527,7 @@
 
                     audioEncoder = new AudioEncoder({
                         output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
-                        error: e => {
-                            console.error('Audio encoder error:', e);
-                            throw new Error('Errore di codifica audio: ' + e.message);
-                        }
+                        error: e => { console.error('Audio encoder error:', e); }
                     });
 
                     audioEncoder.configure({
@@ -1566,6 +1806,8 @@
                     
                     // Settings
                     removeWatermark: removeWatermark,
+                    audioFX: currentAudioFX,
+                    audioPlaybackRate: audio.playbackRate,
                     
                     // Timestamp
                     timestamp: Date.now()
@@ -2043,11 +2285,16 @@
                     if (item.audioFile) {
                         const audioContext = new AudioContext({ sampleRate: 48000 });
                         const audioBuffer = await item.audioFile.arrayBuffer();
-                        const decodedAudio = await audioContext.decodeAudioData(audioBuffer);
+                        let decodedAudio = await audioContext.decodeAudioData(audioBuffer);
+
+                        // Apply stored FX offline
+                        if (item.audioFX && item.audioFX !== 'none') {
+                            decodedAudio = await applyFXOffline(decodedAudio, item.audioFX, item.audioPlaybackRate || 1.0, audioContext);
+                        }
                         
                         const startSample = Math.floor(item.aStart * decodedAudio.sampleRate);
                         const endSample = Math.floor((item.aStart + duration) * decodedAudio.sampleRate);
-                        const sampleCount = endSample - startSample;
+                        const sampleCount = Math.max(0, endSample - startSample);
                         
                         audioData = {
                             left: new Float32Array(sampleCount),
